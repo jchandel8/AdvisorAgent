@@ -1,9 +1,9 @@
 name,email,role,person_id,client_count,demo_note
 Danielle Johnson,danielle.johnson@example.com,advisor,1,31,DEMO advisor: has tech-overweight clients with reviews due this month
 Anthony Gonzalez,anthony.gonzalez@example.com,advisor,2,38,DEMO advisor: has tech-overweight clients with reviews due this month
-Kevin Keith,kevin.keith@example.com,client,10,,DEMO client: Split across advisors: advisor 2 sees only some of this client's accounts (account 19 is with another advisor)
-Shelby Moody,shelby.moody@example.com,client,63,,DEMO client: Joint account with advisor 2
-Jessica Garcia,jessica.garcia2@example.com,client,150,,"DEMO client: Tech-overweight, review due this month (advisor 1)"
+Kevin Keith,kevin.keith@example.com,client,10,,DEMO client: Has accounts with two advisors. Anthony Gonzalez sees only some of them.
+Shelby Moody,shelby.moody@example.com,client,63,,DEMO client: Shares a joint account with Robert Moody. Advisor: Anthony Gonzalez.
+Jessica Garcia,jessica.garcia2@example.com,client,150,,"DEMO client: Heavy in technology stocks, review due this month. Advisor: Danielle Johnson."
 Christopher Davis,christopher.davis@example.com,advisor,3,30,
 James Jones,james.jones@example.com,advisor,4,28,
 Sharon Wong,sharon.wong@example.com,advisor,5,23,

@@ -1,9 +1,12 @@
+# Local development: `docker compose up` starts Postgres, the API and the web app.
+#   Advisor portal: http://localhost:4200/advisor   Client portal: http://localhost:4200/client
+# Secrets (ANTHROPIC_API_KEY) come from .env, which is never committed.
 services:
   db:
     image: postgres:17
     environment:
       POSTGRES_USER: advisor_app
-      POSTGRES_PASSWORD: localdev
+      POSTGRES_PASSWORD: localdev   # local-only container password; AWS uses Secrets Manager (step 5)
       POSTGRES_DB: wealth
     ports:
       - "5432:5432"
@@ -15,5 +18,37 @@ services:
       timeout: 3s
       retries: 10
 
+  api:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://advisor_app:localdev@db:5432/wealth
+      DEMO_AUTH_ENABLED: "true"   # local-only demo login; the API refuses this setting on AWS
+    # Apply migrations, load the seed data if the database is empty, then serve with live reload.
+    command: >
+      sh -c "python -m wealth.migrate && python -m wealth.datagen --if-empty &&
+             uvicorn wealth.api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/src"
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/db:/app/db
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install --no-audit --no-fund && npx ng serve --host 0.0.0.0 --port 4200 --proxy-config proxy.conf.json"
+    volumes:
+      - ./frontend:/app
+      - web_node_modules:/app/node_modules
+    ports:
+      - "4200:4200"
+    depends_on:
+      - api
+
 volumes:
   pgdata:
+  web_node_modules:

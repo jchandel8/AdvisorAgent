@@ -6,6 +6,7 @@ Everything runs in ONE transaction: if any insert fails, the database keeps its 
 from __future__ import annotations
 
 import csv
+import os
 from pathlib import Path
 
 import psycopg
@@ -114,7 +115,13 @@ def load(conn: psycopg.Connection, ds: Dataset) -> None:
             ds.performance,
         )
         demo_rows = [
-            ("advisor", aid, None, "Advisor with tech-overweight clients whose reviews are due this month", i)
+            (
+                "advisor",
+                aid,
+                None,
+                "Several clients are heavy in technology stocks with reviews due this month.",
+                i,
+            )
             for i, aid in enumerate(ds.demo["advisor_ids"])
         ] + [("client", None, cid, note, 10 + i) for i, (cid, note) in enumerate(ds.demo["clients"].items())]
         _copy(cur, "demo_users", ["person_type", "advisor_id", "client_id", "note", "sort_order"], demo_rows)
@@ -175,6 +182,8 @@ def write_demo_users(conn: psycopg.Connection, ds: Dataset, path: Path = DEMO_US
     ]
     rows.sort(key=lambda r: (r["demo_note"] == "", r["role"], r["person_id"]))
 
+    if not path.parent.is_dir() or not os.access(path.parent, os.W_OK):
+        return 0  # e.g. inside the API container, where the repo root isn't mounted
     with path.open("w", newline="") as f:
         writer = csv.DictWriter(
             f, fieldnames=["name", "email", "role", "person_id", "client_count", "demo_note"]
