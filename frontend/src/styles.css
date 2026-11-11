@@ -1,0 +1,142 @@
+/* Global styles. Design source of truth: design-system/advisoragent/MASTER.md */
+@import "tailwindcss";
+@import "@fontsource-variable/instrument-sans/wdth.css";
+
+/* Dark mode follows the data-theme attribute on <html> (set before first paint in index.html). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---- Tokens: light (default) ------------------------------------------------------------------ */
+:root {
+  color-scheme: light;
+  --paper: #f6f7f5;
+  --surface: #ffffff;
+  --surface-sunk: #eef1ef;
+  --ink: #17201d;
+  --ink-muted: #55625d;
+  --rule: #dce1de;
+  --rule-strong: #c3cbc7;
+  --advisor: #0e5a4a;
+  --advisor-soft: #e3efeb;
+  --client: #2e3a8c;
+  --client-soft: #e6e8f6;
+  --gain: #17663f;
+  --loss: #a3261b;
+  --focus: #1d5fd1;
+  /* Chart polarity (validated blue/red diverging pair) */
+  --chart-pos: #2a78d6;
+  --chart-neg: #e34948;
+  --chart-grid: #e6eae8;
+  /* Account swatches: dataviz categorical palette, validated on #FFFFFF */
+  --swatch-0: #2a78d6;
+  --swatch-1: #eb6834;
+  --swatch-2: #1baf7a;
+  --swatch-3: #eda100;
+  --swatch-4: #e87ba4;
+  --swatch-5: #008300;
+  --swatch-6: #6250d6;
+  --swatch-7: #e34948;
+}
+
+/* ---- Tokens: dark (re-derived, validated on #18211E) --------------------------------------------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #111816;
+  --surface: #18211e;
+  --surface-sunk: #141c19;
+  --ink: #e6ece9;
+  --ink-muted: #a3b0ab;
+  --rule: #2c3833;
+  --rule-strong: #3b4943;
+  --advisor: #5fbfa6;
+  --advisor-soft: #1d3530;
+  --client: #9faaf5;
+  --client-soft: #232a4d;
+  --gain: #5cc38c;
+  --loss: #f08a7e;
+  --focus: #7aa7ff;
+  --chart-pos: #3987e5;
+  --chart-neg: #e66767;
+  --chart-grid: #26312d;
+  --swatch-0: #3987e5;
+  --swatch-1: #d95926;
+  --swatch-2: #199e70;
+  --swatch-3: #c98500;
+  --swatch-4: #d55181;
+  --swatch-5: #008300;
+  --swatch-6: #9085e9;
+  --swatch-7: #e66767;
+}
+
+/* Expose tokens to Tailwind utilities (bg-paper, text-ink, border-rule, ...). `inline` keeps them as
+   live CSS variables so the theme switch needs no rebuild. */
+@theme inline {
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-advisor: var(--advisor);
+  --color-advisor-soft: var(--advisor-soft);
+  --color-client: var(--client);
+  --color-client-soft: var(--client-soft);
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+  --color-focus: var(--focus);
+  --radius-panel: 12px;
+  --radius-control: 6px;
+}
+
+/* ---- Base ------------------------------------------------------------------------------------------ */
+@layer base {
+  html {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 100%;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    line-height: 1.5;
+    min-height: 100dvh;
+  }
+  h1,
+  h2,
+  h3 {
+    line-height: 1.25;
+    text-wrap: balance;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  button,
+  a,
+  select,
+  [role="button"] {
+    cursor: pointer;
+  }
+}
+
+/* Money and percentages: equal-width digits so columns line up. */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+/* Dense money tables use the condensed end of the width axis. */
+.ledger {
+  font-stretch: 88%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

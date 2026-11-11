@@ -114,7 +114,7 @@ def test_some_clients_are_split_across_advisors(ds):
     ]
     assert len(split) >= 5
     split_demo = [
-        cid for cid, note in ds.demo["clients"].items() if note.startswith("Split across advisors")
+        cid for cid, note in ds.demo["clients"].items() if note.startswith("Has accounts with two advisors")
     ][0]
     assert split_demo in split
 

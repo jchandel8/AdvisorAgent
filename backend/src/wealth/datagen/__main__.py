@@ -29,6 +29,7 @@ def main() -> None:
         "--anchor", type=date.fromisoformat, help="anchor date (default: DATA_ANCHOR_DATE or today)"
     )
     parser.add_argument("--seed", type=int, default=SEED)
+    parser.add_argument("--if-empty", action="store_true", help="only load if the database has no accounts")
     args = parser.parse_args()
 
     settings = get_settings()
@@ -37,6 +38,11 @@ def main() -> None:
 
     started = time.monotonic()
     migrate(settings.database_url)
+    if args.if_empty:
+        with psycopg.connect(settings.database_url) as conn:
+            if conn.execute("SELECT count(*) FROM accounts").fetchone()[0] > 0:
+                print(f"Database {db_name!r} already has data; skipping the seed load.")
+                return
     ds = generate(anchor, seed=args.seed)
     with psycopg.connect(settings.database_url) as conn:
         load(conn, ds)

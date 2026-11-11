@@ -714,17 +714,22 @@ def generate(anchor: date, seed: int = SEED) -> Dataset:
         for c in tech_clients
         if any(hh.advisor_id == demo_advisors[1] and c in hh.client_ids for hh in households)
     )
+    names = {c["id"]: f"{c['first_name']} {c['last_name']}" for c in clients}
+    advisor_names = {a["id"]: f"{a['first_name']} {a['last_name']}" for a in advisors}
+    spouse = joint_hh.client_ids[1]
     demo = {
         "advisor_ids": demo_advisors,
         "tech_overweight_client_ids": tech_clients,
         "clients": {
-            joint_hh.client_ids[0]: f"Joint account with advisor {demo_advisors[0]}",
-            demo_split.client_ids[0]: (
-                f"Split across advisors: advisor {demo_advisors[0]} sees only some of this "
-                f"client's accounts (account {demo_split.account_ids[-1]} is with another "
-                f"advisor)"
+            joint_hh.client_ids[0]: (
+                f"Shares a joint account with {names[spouse]}. Advisor: {advisor_names[demo_advisors[0]]}."
             ),
-            tech_demo: f"Tech-overweight, review due this month (advisor {demo_advisors[1]})",
+            demo_split.client_ids[0]: (
+                f"Has accounts with two advisors. {advisor_names[demo_advisors[0]]} sees only some of them."
+            ),
+            tech_demo: (
+                f"Heavy in technology stocks, review due this month. Advisor: {advisor_names[demo_advisors[1]]}."
+            ),
         },
     }
 
