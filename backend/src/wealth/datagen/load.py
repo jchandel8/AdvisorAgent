@@ -17,6 +17,8 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 DEMO_USERS_CSV = REPO_ROOT / "demo_users.csv"
 
 TABLES = [
+    "agent_conversations",
+    "demo_users",
     "answer_cache",
     "documents",
     "performance",
@@ -111,6 +113,11 @@ def load(conn: psycopg.Connection, ds: Dataset) -> None:
             ],
             ds.performance,
         )
+        demo_rows = [
+            ("advisor", aid, None, "Advisor with tech-overweight clients whose reviews are due this month", i)
+            for i, aid in enumerate(ds.demo["advisor_ids"])
+        ] + [("client", None, cid, note, 10 + i) for i, (cid, note) in enumerate(ds.demo["clients"].items())]
+        _copy(cur, "demo_users", ["person_type", "advisor_id", "client_id", "note", "sort_order"], demo_rows)
         _copy(
             cur,
             "documents",

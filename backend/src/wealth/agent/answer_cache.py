@@ -62,7 +62,7 @@ class AnswerCache:
         row = conn.execute(
             f"WITH {VISIBLE} SELECT coalesce(string_agg(account_id::text, ',' ORDER BY account_id), '') AS ids"
             " FROM visible",
-            {"advisor_id": advisor_id},
+            {"viewer_kind": "advisor", "viewer_id": advisor_id},
         ).fetchone()
         access = row["ids"] if isinstance(row, dict) else row[0]
         payload = json.dumps(

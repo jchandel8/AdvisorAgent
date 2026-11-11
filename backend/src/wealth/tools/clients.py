@@ -32,7 +32,7 @@ LEFT JOIN account_mv m ON m.account_id = x.account_id
 def get_my_clients(ctx: ToolContext, params: NoInput) -> dict:
     rows = ctx.conn.execute(
         _CLIENT_ROLLUP + " GROUP BY c.id ORDER BY c.last_name, c.first_name, c.id",
-        {"advisor_id": ctx.advisor_id, "as_of": ctx.today},
+        {**ctx.viewer_params(), "as_of": ctx.today},
     ).fetchall()
     return {"client_count": len(rows), "clients": rows}
 
@@ -44,7 +44,7 @@ def find_reviews_due(ctx: ToolContext, params: ReviewsInput) -> dict:
         GROUP BY c.id
         ORDER BY c.next_review_date, c.id""",
         {
-            "advisor_id": ctx.advisor_id,
+            **ctx.viewer_params(),
             "as_of": ctx.today,
             "until": ctx.today + timedelta(days=params.within_days),
         },

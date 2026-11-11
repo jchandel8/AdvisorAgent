@@ -88,7 +88,7 @@ def get_holdings(ctx: ToolContext, params: HoldingsInput) -> dict:
     if not ids:
         return NOT_FOUND
     q = {
-        "advisor_id": ctx.advisor_id,
+        **ctx.viewer_params(),
         "ids": ids,
         "as_of": params.as_of_date or ctx.today,
         **params.filter_params(),

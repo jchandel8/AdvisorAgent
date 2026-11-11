@@ -9,13 +9,19 @@ dependencies = [
     "anthropic>=0.40",
     "faker>=30.0",
     "python-dotenv>=1.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
 ]
 
 [project.scripts]
 wealth-agent = "wealth.agent.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8.3", "ruff>=0.7"]
+dev = [
+    "httpx>=0.27",
+    "pytest>=8.3",
+    "ruff>=0.7",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -37,3 +43,7 @@ target-version = "py312"
 select = ["E", "F", "I", "B", "UP"]
 # Line length is enforced by `ruff format`; long SQL and prompt strings are left intact.
 ignore = ["E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection markers are meant to be used as argument defaults.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", "fastapi.params.Depends"]

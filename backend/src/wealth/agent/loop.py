@@ -24,10 +24,11 @@ from typing import Any
 
 import psycopg
 
+from wealth.access import Viewer, accessible_client_name
 from wealth.agent.answer_cache import AnswerCache
 from wealth.agent.prompts import system_prompt
 from wealth.config import get_settings
-from wealth.db import connection
+from wealth.db import connection, read_only
 from wealth.tools.registry import execute_tool, tool_definitions
 
 MAX_TOOL_ROUNDS = 10  # hard stop on runaway loops (cost control)
@@ -88,6 +89,8 @@ class AdvisorAgent:
         today: date | None = None,
         cache: AnswerCache | None = None,
         conn: psycopg.Connection | None = None,  # tests pass one; otherwise pool connections are used
+        history: list[dict] | None = None,  # resume a stored conversation
+        transcript: list[str] | None = None,
     ):
         self.advisor_id = advisor_id
         self.client = client
@@ -95,8 +98,10 @@ class AdvisorAgent:
         self.today = today or date.today()
         self.cache = cache
         self.conn = conn
-        self.history: list[dict] = []  # exactly what is sent to the model (append-only)
-        self.transcript: list[str] = []  # questions and final answers only (the answer-cache key)
+        # history: exactly what is sent to the model (append-only, JSON-serializable so it can be stored).
+        # transcript: questions and final answers only (the answer-cache key).
+        self.history: list[dict] = list(history or [])
+        self.transcript: list[str] = list(transcript or [])
         self._system = [
             {"type": "text", "text": system_prompt(self.today), "cache_control": {"type": "ephemeral"}}
         ]
@@ -113,7 +118,29 @@ class AdvisorAgent:
         with connection() as c, c.transaction():
             yield c
 
-    def ask(self, question: str) -> TurnResult:
+    @contextmanager
+    def _read_conn(self) -> Iterator[psycopg.Connection]:
+        if self.conn is not None:
+            yield self.conn
+            return
+        with read_only() as c:
+            yield c
+
+    def _focus_client_name(self, client_id: int) -> str | None:
+        """The client's name if this advisor shares at least one account with them, else None."""
+        with self._read_conn() as c:
+            return accessible_client_name(c, Viewer("advisor", self.advisor_id), client_id)
+
+    def ask(self, question: str, *, focus_client_id: int | None = None) -> TurnResult:
+        """Answer one question. focus_client_id = the client picked in the UI (verified here, never trusted)."""
+        if focus_client_id is not None:
+            name = self._focus_client_name(focus_client_id)
+            if name is None:
+                return TurnResult("I can't find that client among the clients you can access.", "not_found")
+            question = (
+                f"[Selected client: {name} (client ID {focus_client_id}). Answer about this client unless the "
+                f"question says otherwise.]\n\n{question}"
+            )
         key = None
         if self.cache is not None:
             with self._write_conn() as c:
@@ -130,7 +157,7 @@ class AdvisorAgent:
                 self._record(question, cached, [{"type": "text", "text": cached}])
                 return TurnResult(cached, "cache_hit")
 
-        result = self._run_model(question)
+        result = self._run_model(question, focus_client_id)
 
         if key is not None and result.stop_reason == "end_turn" and result.text:
             with self._write_conn() as c:
@@ -159,7 +186,7 @@ class AdvisorAgent:
             options["fallbacks"] = "default"
         return options
 
-    def _run_model(self, question: str) -> TurnResult:
+    def _run_model(self, question: str, focus_client_id: int | None = None) -> TurnResult:
         self.history.append({"role": "user", "content": question})
         calls: list[ToolCall] = []
         usage = Usage()
@@ -169,7 +196,7 @@ class AdvisorAgent:
             response = self.client.beta.messages.create(messages=self.history, **options)
             usage.add(getattr(response, "usage", None))
             # Append the full content (thinking + text + tool_use blocks) unchanged: history is append-only.
-            self.history.append({"role": "assistant", "content": response.content})
+            self.history.append({"role": "assistant", "content": [_as_param(b) for b in response.content]})
 
             if response.stop_reason == "refusal":
                 return self._finish(
@@ -182,6 +209,12 @@ class AdvisorAgent:
                 if response.stop_reason == "max_tokens":
                     text += "\n\n[Answer cut off: response length limit reached.]"
                 return self._finish(question, text, response.stop_reason, calls, usage)
+
+            # The selected client is re-checked before every round of tool calls (access may have been revoked).
+            if focus_client_id is not None and self._focus_client_name(focus_client_id) is None:
+                self.history.append({"role": "user", "content": _skipped_results(response.content)})
+                text = "Your access to the selected client has changed, so I stopped. Reload and try again."
+                return self._finish(question, text, "access_revoked", calls, usage)
 
             results = []
             for block in response.content:
@@ -209,3 +242,19 @@ class AdvisorAgent:
     def _finish(self, question, text, stop_reason, calls, usage) -> TurnResult:
         self.transcript += [question, text]
         return TurnResult(text, stop_reason, calls, usage)
+
+
+def _as_param(block: Any) -> dict:
+    """A response content block as a plain dict that can be stored as JSON and sent back to the API."""
+    if hasattr(block, "model_dump"):
+        return block.model_dump(mode="json", exclude_none=True)
+    return {k: v for k, v in vars(block).items() if v is not None}  # test fakes (SimpleNamespace)
+
+
+def _skipped_results(content: list) -> list[dict]:
+    """tool_result blocks for tool calls we refused to run, so the stored history stays valid."""
+    return [
+        {"type": "tool_result", "tool_use_id": b.id, "content": "not run: access changed", "is_error": True}
+        for b in content
+        if b.type == "tool_use"
+    ]

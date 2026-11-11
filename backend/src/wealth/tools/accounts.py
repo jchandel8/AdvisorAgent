@@ -22,7 +22,7 @@ def get_accounts(ctx: ToolContext, params: ClientInput) -> dict:
         JOIN accounts a ON a.id = v.account_id
         LEFT JOIN account_mv m ON m.account_id = v.account_id
         ORDER BY a.id""",
-        {"advisor_id": ctx.advisor_id, "as_of": ctx.today, "client_id": params.client_id},
+        {**ctx.viewer_params(), "as_of": ctx.today, "client_id": params.client_id},
     ).fetchall()
     if not rows:
         return NOT_FOUND

@@ -31,6 +31,7 @@ class Settings:
     answer_cache_enabled: bool
     answer_cache_ttl_hours: float
     answer_cache_max_entries: int
+    demo_auth_enabled: bool
 
 
 @lru_cache(maxsize=1)
@@ -58,4 +59,19 @@ def get_settings() -> Settings:
         answer_cache_enabled=os.environ.get("ANSWER_CACHE_ENABLED", "true").strip().lower() != "false",
         answer_cache_ttl_hours=float(os.environ.get("ANSWER_CACHE_TTL_HOURS", "").strip() or 24),
         answer_cache_max_entries=int(os.environ.get("ANSWER_CACHE_MAX_ENTRIES", "").strip() or 1000),
+        # Local-only stand-in for login (pick a demo user). Off unless explicitly enabled; refused on AWS.
+        demo_auth_enabled=os.environ.get("DEMO_AUTH_ENABLED", "false").strip().lower() == "true",
     )
+
+
+# Environment variables that AWS sets inside ECS tasks, Lambda and other managed runtimes.
+AWS_RUNTIME_MARKERS = (
+    "ECS_CONTAINER_METADATA_URI_V4",
+    "ECS_CONTAINER_METADATA_URI",
+    "AWS_EXECUTION_ENV",
+    "AWS_LAMBDA_FUNCTION_NAME",
+)
+
+
+def running_on_aws() -> bool:
+    return any(os.environ.get(name) for name in AWS_RUNTIME_MARKERS)
