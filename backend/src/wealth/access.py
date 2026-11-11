@@ -1,25 +1,32 @@
-"""The single place where "which accounts can this advisor see?" is defined.
+"""The single place where "which accounts can this person see?" is defined.
 
-Every tool query starts with `WITH {VISIBLE}` and joins through it. An advisor sees an account only if
-there is an account_access row linking them to it and the account is open. Clients are reached only
-through those visible accounts, which is what limits an advisor to the accounts they share with a client.
+Every query starts with `WITH {VISIBLE}` and joins through it. A person (advisor or client) sees an account
+only if an account_access row links them to it and the account is open. Clients are reached only through
+those visible accounts, which is what limits an advisor to the accounts they share with a client.
+
+Who the viewer is always comes from the backend session (CLI flag now, verified login token later),
+never from the model or from request parameters.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from typing import Literal
 
 import psycopg
 
-# Requires the query parameter %(advisor_id)s.
+# Requires the query parameters %(viewer_kind)s ('advisor' or 'client') and %(viewer_id)s.
 VISIBLE = """
 visible AS (
     SELECT aa.account_id
     FROM account_access aa
     JOIN accounts a ON a.id = aa.account_id
-    WHERE aa.advisor_id = %(advisor_id)s
-      AND a.close_date IS NULL
+    WHERE a.close_date IS NULL
+      AND (
+          (%(viewer_kind)s = 'advisor' AND aa.advisor_id = %(viewer_id)s)
+          OR (%(viewer_kind)s = 'client' AND aa.client_id = %(viewer_id)s)
+      )
 )"""
 
 
@@ -55,7 +62,7 @@ account_mv AS (
 
 SNAPSHOT = snapshot_sql("visible")
 
-# Visible accounts limited to the tool's scope. Requires %(advisor_id)s (via VISIBLE) and %(ids)s.
+# Visible accounts limited to the tool's scope. Requires the VISIBLE parameters and %(ids)s.
 SCOPED = """
 scoped AS (
     SELECT account_id FROM visible WHERE account_id = ANY(%(ids)s)
@@ -66,12 +73,30 @@ NOT_FOUND = {"error": "not found"}
 
 
 @dataclass(frozen=True)
+class Viewer:
+    """The signed-in person. Built only by the backend from the session."""
+
+    kind: Literal["advisor", "client"]
+    id: int
+
+    def __post_init__(self):
+        if self.kind not in ("advisor", "client") or not isinstance(self.id, int) or self.id <= 0:
+            raise ValueError(f"invalid viewer {self.kind!r} {self.id!r}")
+
+    def params(self) -> dict:
+        return {"viewer_kind": self.kind, "viewer_id": self.id}
+
+
+@dataclass(frozen=True)
 class ToolContext:
-    """Built by the backend for each request. advisor_id comes from the session, never from the model."""
+    """Built by the backend for each request. The viewer comes from the session, never from the model."""
 
     conn: psycopg.Connection
-    advisor_id: int
+    viewer: Viewer
     today: date
+
+    def viewer_params(self) -> dict:
+        return self.viewer.params()
 
 
 def scoped_account_ids(ctx: ToolContext, *, account_id: int | None, client_id: int | None) -> list[int]:
@@ -86,7 +111,7 @@ def scoped_account_ids(ctx: ToolContext, *, account_id: int | None, client_id: i
     if account_id is not None:
         rows = ctx.conn.execute(
             f"WITH {VISIBLE} SELECT account_id FROM visible WHERE account_id = %(account_id)s",
-            {"advisor_id": ctx.advisor_id, "account_id": account_id},
+            {**ctx.viewer_params(), "account_id": account_id},
         ).fetchall()
     else:
         rows = ctx.conn.execute(
@@ -95,7 +120,7 @@ def scoped_account_ids(ctx: ToolContext, *, account_id: int | None, client_id: i
             FROM visible v
             JOIN account_access ca ON ca.account_id = v.account_id AND ca.client_id = %(client_id)s
             ORDER BY v.account_id""",
-            {"advisor_id": ctx.advisor_id, "client_id": client_id},
+            {**ctx.viewer_params(), "client_id": client_id},
         ).fetchall()
     return [r["account_id"] for r in rows]
 
@@ -103,3 +128,21 @@ def scoped_account_ids(ctx: ToolContext, *, account_id: int | None, client_id: i
 def advisor_exists(conn: psycopg.Connection, advisor_id: int) -> bool:
     row = conn.execute("SELECT 1 FROM advisors WHERE id = %s", (advisor_id,)).fetchone()
     return row is not None
+
+
+def accessible_client_name(conn: psycopg.Connection, viewer: Viewer, client_id: int) -> str | None:
+    """Name of the client if the viewer can see at least one of their accounts, else None."""
+    row = conn.execute(
+        f"""WITH {VISIBLE}
+        SELECT c.first_name || ' ' || c.last_name AS name
+        FROM clients c
+        WHERE c.id = %(client_id)s
+          AND EXISTS (
+              SELECT 1 FROM visible v
+              JOIN account_access ca ON ca.account_id = v.account_id AND ca.client_id = c.id
+          )""",
+        {**viewer.params(), "client_id": client_id},
+    ).fetchone()
+    if row is None:
+        return None
+    return row["name"] if isinstance(row, dict) else row[0]

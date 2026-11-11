@@ -19,7 +19,7 @@ from typing import Any
 import psycopg
 from pydantic import BaseModel, ValidationError
 
-from wealth.access import ToolContext
+from wealth.access import ToolContext, Viewer
 from wealth.db import read_only
 from wealth.tools.accounts import get_accounts
 from wealth.tools.clients import find_reviews_due, get_my_clients
@@ -144,10 +144,14 @@ def execute_tool(
 
     try:
         if conn is not None:
-            result = tool.fn(ToolContext(conn=conn, advisor_id=advisor_id, today=today), params)
+            result = tool.fn(
+                ToolContext(conn=conn, viewer=Viewer("advisor", advisor_id), today=today), params
+            )
         else:
             with read_only() as c:
-                result = tool.fn(ToolContext(conn=c, advisor_id=advisor_id, today=today), params)
+                result = tool.fn(
+                    ToolContext(conn=c, viewer=Viewer("advisor", advisor_id), today=today), params
+                )
     except Exception:
         log.exception("tool %s failed", name)
         return {"error": "tool failed"}

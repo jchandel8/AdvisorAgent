@@ -48,7 +48,7 @@ def get_performance(ctx: ToolContext, params: PerformanceInput) -> dict:
     ids = scoped_account_ids(ctx, account_id=params.account_id, client_id=params.client_id)
     if not ids:
         return NOT_FOUND
-    q = {"advisor_id": ctx.advisor_id, "ids": ids, "as_of": params.as_of_date or ctx.today}
+    q = {**ctx.viewer_params(), "ids": ids, "as_of": params.as_of_date or ctx.today}
 
     rows = ctx.conn.execute(_QUERY, q).fetchall()
     scope = {"account_id": params.account_id, "client_id": params.client_id}

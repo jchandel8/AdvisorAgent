@@ -34,7 +34,7 @@ def get_transactions(ctx: ToolContext, params: TransactionsInput) -> dict:
     if start > end:
         return {"error": "start_date must be on or before end_date"}
     q = {
-        "advisor_id": ctx.advisor_id,
+        **ctx.viewer_params(),
         "ids": ids,
         "start": start,
         "end": end,
