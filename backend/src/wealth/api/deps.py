@@ -20,7 +20,7 @@ import psycopg
 from fastapi import Depends, Header, HTTPException, status
 
 from wealth.access import Viewer
-from wealth.api.cognito import TokenError, signing_key, verify_access_token
+from wealth.api.cognito import NotSetUp, TokenError, signing_key, verify_access_token
 from wealth.config import get_settings, running_on_aws
 from wealth.db import connection, read_only
 
@@ -98,6 +98,8 @@ def _cognito_user(authorization: str | None, conn: psycopg.Connection, key_resol
         )
     except TokenError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your sign-in has expired or isn't valid.") from exc
+    except NotSetUp as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
     if ident.kind == "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "The admin portal isn't available yet.")
     table = "advisors" if ident.kind == "advisor" else "clients"  # fixed by verify_access_token
@@ -106,7 +108,12 @@ def _cognito_user(authorization: str | None, conn: psycopg.Connection, key_resol
         (ident.username,),
     ).fetchone()
     if row is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "There's no account for this sign-in.")
+        # Signed in fine, but not provisioned: 403 (not 401) and say exactly what is missing.
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            f"The login '{ident.username}' is in the {ident.kind}s group, but there is no {ident.kind} with the "
+            f"username '{ident.username}' in AdvisorAgent.",
+        )
     return CurrentUser(Viewer(ident.kind, row["id"]), row["name"])
 
 

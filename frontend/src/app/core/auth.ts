@@ -106,7 +106,15 @@ export class Auth {
     const res = await fetch('/api/me', {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    if (!res.ok) throw new Error(`Sign-in was not accepted (${res.status}).`);
+    if (!res.ok) {
+      const detail = await res
+        .json()
+        .then((b: { detail?: unknown }) => b.detail)
+        .catch(() => null);
+      throw new Error(
+        typeof detail === 'string' ? detail : `Sign-in was not accepted (${res.status}).`,
+      );
+    }
     const me = (await res.json()) as Me;
     if (me.kind === 'advisor' || me.kind === 'client') {
       this.session.signIn({ kind: me.kind, id: me.id, name: me.name }, { persist: false });

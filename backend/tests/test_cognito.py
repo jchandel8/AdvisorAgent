@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from tests.fixtures import A1, C1
 from wealth.api import deps, routes_advisor
-from wealth.api.cognito import TokenError, verify_access_token
+from wealth.api.cognito import NotSetUp, TokenError, verify_access_token
 from wealth.api.main import create_app
 from wealth.config import get_settings
 
@@ -66,9 +66,6 @@ def test_valid_advisor_and_client_tokens():
         pytest.param({"iss": "https://cognito-idp.us-west-1.amazonaws.com/us-west-1_OTHER"}, id="other-pool"),
         pytest.param({"client_id": "someone-elses-app"}, id="other-client"),
         pytest.param({"token_use": "id"}, id="id-token"),
-        pytest.param({"cognito:groups": []}, id="no-group"),
-        pytest.param({"cognito:groups": ["advisors", "clients"]}, id="two-groups"),
-        pytest.param({"cognito:groups": ["superusers"]}, id="unknown-group"),
         pytest.param({"username": None}, id="no-username"),
         pytest.param({"_key": OTHER_KEY}, id="wrong-signing-key"),
     ],
@@ -76,6 +73,14 @@ def test_valid_advisor_and_client_tokens():
 def test_bad_tokens_are_rejected(bad):
     with pytest.raises(TokenError):
         verify(token(**bad))
+
+
+@pytest.mark.parametrize(
+    "groups", [[], ["advisors", "clients"], ["superusers"]], ids=["none", "two", "unknown"]
+)
+def test_logins_without_exactly_one_group_are_not_set_up(groups):
+    with pytest.raises(NotSetUp, match="exactly one Cognito group"):
+        verify(token(**{"cognito:groups": groups}))
 
 
 def test_unsigned_and_hmac_tokens_are_rejected():
@@ -150,14 +155,20 @@ def test_group_decides_the_portal(cognito_api):
 def test_advisor_group_with_a_client_username_finds_no_account(cognito_api):
     # Group says advisor, but the username belongs to a client: no advisor row matches, so no access.
     t = token(**{"cognito:groups": ["advisors"], "username": "cli201"})
-    assert cognito_api.get("/api/me", headers=bearer(t)).status_code == 401
+    r = cognito_api.get("/api/me", headers=bearer(t))
+    assert r.status_code == 403 and "no advisor with the username 'cli201'" in r.json()["detail"]
+
+
+def test_login_with_no_group_gets_a_clear_403(cognito_api):
+    r = cognito_api.get("/api/me", headers=bearer(token(**{"cognito:groups": [], "username": "advisor1"})))
+    assert r.status_code == 403 and "exactly one Cognito group" in r.json()["detail"]
 
 
 def test_bad_or_missing_tokens_are_401(cognito_api):
     assert cognito_api.get("/api/me").status_code == 401
     assert cognito_api.get("/api/me", headers={"Authorization": "Basic abc"}).status_code == 401
     assert cognito_api.get("/api/me", headers=bearer(token(exp=int(time.time()) - 600))).status_code == 401
-    assert cognito_api.get("/api/me", headers=bearer(token(username="nobody"))).status_code == 401
+    assert cognito_api.get("/api/me", headers=bearer(token(username="nobody"))).status_code == 403
 
 
 def test_admins_wait_for_step_4(cognito_api):
@@ -178,7 +189,7 @@ def test_auth_config_is_public_and_secret_free(cognito_api):
 def test_cognito_mode_refuses_to_start_without_pool_settings(monkeypatch):
     monkeypatch.setenv("AUTH_MODE", "cognito")
     for name in ("COGNITO_REGION", "COGNITO_USER_POOL_ID", "COGNITO_CLIENT_ID"):
-        monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv(name, "")  # empty, not unset: .env must not refill it
     get_settings.cache_clear()
     try:
         with pytest.raises(RuntimeError, match="COGNITO_REGION"):

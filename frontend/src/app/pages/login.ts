@@ -105,10 +105,11 @@ export class AuthCallback implements OnInit {
     try {
       const portal = await this.auth.completeLogin();
       await this.router.navigateByUrl(portal, { replaceUrl: true });
-    } catch {
+    } catch (err) {
       await this.auth.clear();
+      const reason = err instanceof Error ? err.message : '';
       this.error.set(
-        "Your account isn't set up for this app yet, or the sign-in link expired. Ask the project owner for access, then try again.",
+        `${reason} Ask the project owner to set up your login, then try again.`.trim(),
       );
     }
   }
