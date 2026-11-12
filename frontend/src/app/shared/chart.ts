@@ -53,7 +53,13 @@ export interface ChartTable {
             <thead class="sticky top-0 bg-surface-sunk text-left text-ink-muted">
               <tr>
                 @for (c of table().columns; track $index) {
-                  <th scope="col" class="px-3 py-2 font-medium" [class.text-right]="isNumeric($index)">{{ c }}</th>
+                  <th
+                    scope="col"
+                    class="px-3 py-2 font-medium"
+                    [class.text-right]="isNumeric($index)"
+                  >
+                    {{ c }}
+                  </th>
                 }
               </tr>
             </thead>
@@ -61,7 +67,13 @@ export interface ChartTable {
               @for (row of table().rows; track $index) {
                 <tr class="border-t border-rule">
                   @for (cell of row; track $index) {
-                    <td class="px-3 py-2" [class.num]="isNumeric($index)" [class.text-right]="isNumeric($index)">{{ cell }}</td>
+                    <td
+                      class="px-3 py-2"
+                      [class.num]="isNumeric($index)"
+                      [class.text-right]="isNumeric($index)"
+                    >
+                      {{ cell }}
+                    </td>
                   }
                 </tr>
               }
@@ -69,7 +81,14 @@ export interface ChartTable {
           </table>
         </div>
       } @else {
-        <div echarts [options]="options()" [initOpts]="initOpts" [style.height.px]="height()" role="img" [attr.aria-label]="summary()"></div>
+        <div
+          echarts
+          [options]="options()"
+          [initOpts]="initOpts"
+          [style.height.px]="height()"
+          role="img"
+          [attr.aria-label]="summary()"
+        ></div>
       }
     </figure>
   `,

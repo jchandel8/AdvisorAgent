@@ -6,7 +6,9 @@ const KEY = 'advisoragent.theme';
 /** Light by default; the dark choice is remembered per browser. index.html applies it before first paint. */
 @Injectable({ providedIn: 'root' })
 export class Theme {
-  readonly current = signal<ThemeName>(document.documentElement.dataset['theme'] === 'dark' ? 'dark' : 'light');
+  readonly current = signal<ThemeName>(
+    document.documentElement.dataset['theme'] === 'dark' ? 'dark' : 'light',
+  );
 
   toggle(): void {
     const next: ThemeName = this.current() === 'dark' ? 'light' : 'dark';

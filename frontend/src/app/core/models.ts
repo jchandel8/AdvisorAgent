@@ -60,7 +60,12 @@ export interface Breakdown {
 }
 
 export interface Holdings {
-  accounts: { account_id: number; account_name: string; as_of_date: string | null; market_value: number }[];
+  accounts: {
+    account_id: number;
+    account_name: string;
+    as_of_date: string | null;
+    market_value: number;
+  }[];
   portfolio_market_value: number;
   selection: Breakdown;
   sector_summary: (Breakdown & { sector: string })[];
@@ -113,7 +118,12 @@ export type Returns = { [K in `return_${Period}_pct`]: number | null };
 export interface Performance {
   combined_market_value_weighted: Returns & { market_value: number };
   partial_periods: Period[];
-  accounts: (Returns & { account_id: number; account_name: string; as_of_date: string; market_value: number })[];
+  accounts: (Returns & {
+    account_id: number;
+    account_name: string;
+    as_of_date: string;
+    market_value: number;
+  })[];
   growth: { as_of_date: string; market_value: number; growth_index: number }[];
   note?: string;
 }

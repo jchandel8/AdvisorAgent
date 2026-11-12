@@ -1,6 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import {
+  ActivatedRoute,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
 import { map } from 'rxjs';
 import { Session } from '../core/session';
 import { Theme } from '../core/theme';
@@ -34,8 +40,14 @@ export interface ShellData {
     >
     <div class="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr]">
       <!-- Rail (desktop) / top band (phone) -->
-      <header class="lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:border-r lg:border-rule lg:bg-surface">
-        <div class="px-5 py-4 text-paper" [class.bg-advisor]="isAdvisor()" [class.bg-client]="!isAdvisor()">
+      <header
+        class="lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:border-r lg:border-rule lg:bg-surface"
+      >
+        <div
+          class="px-5 py-4 text-paper"
+          [class.bg-advisor]="isAdvisor()"
+          [class.bg-client]="!isAdvisor()"
+        >
           <p class="text-lg leading-tight font-semibold">{{ data().title }}</p>
           <p class="text-sm opacity-85">AdvisorAgent</p>
         </div>
@@ -63,7 +75,9 @@ export interface ShellData {
           </ul>
         </nav>
 
-        <div class="flex items-center justify-between gap-2 border-b border-rule bg-surface px-5 py-2 lg:block lg:space-y-2 lg:border-t lg:border-b-0 lg:py-4">
+        <div
+          class="flex items-center justify-between gap-2 border-b border-rule bg-surface px-5 py-2 lg:block lg:space-y-2 lg:border-t lg:border-b-0 lg:py-4"
+        >
           <p class="min-w-0 truncate text-sm">
             <span class="text-ink-muted">Signed in as</span>
             <span class="font-medium"> {{ user()?.name }}</span>
@@ -89,13 +103,19 @@ export interface ShellData {
         </div>
       </header>
 
-      <main id="main" class="mx-auto w-full max-w-[1200px] px-4 pt-6 pb-28 sm:px-8 lg:pt-10 lg:pb-12">
+      <main
+        id="main"
+        class="mx-auto w-full max-w-[1200px] px-4 pt-6 pb-28 sm:px-8 lg:pt-10 lg:pb-12"
+      >
         <router-outlet />
       </main>
     </div>
 
     <!-- Bottom tabs (phone and tablet) -->
-    <nav class="fixed inset-x-0 bottom-0 z-10 border-t border-rule bg-surface lg:hidden" [attr.aria-label]="data().title">
+    <nav
+      class="fixed inset-x-0 bottom-0 z-10 border-t border-rule bg-surface lg:hidden"
+      [attr.aria-label]="data().title"
+    >
       <ul class="mx-auto flex max-w-xl justify-around">
         @for (item of data().nav; track item.path) {
           <li class="flex-1">

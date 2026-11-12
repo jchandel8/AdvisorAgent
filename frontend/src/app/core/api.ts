@@ -22,7 +22,9 @@ import {
 export class Api {
   private readonly http = inject(HttpClient);
 
-  private params(values: Record<string, string | number | readonly string[] | null | undefined>): HttpParams {
+  private params(
+    values: Record<string, string | number | readonly string[] | null | undefined>,
+  ): HttpParams {
     let p = new HttpParams();
     for (const [key, value] of Object.entries(values)) {
       if (value === null || value === undefined) continue;
@@ -48,7 +50,9 @@ export class Api {
     return this.http.get<AccountList>('/api/client/accounts');
   }
   clientHoldings(accountId: number | null): Observable<Holdings> {
-    return this.http.get<Holdings>('/api/client/holdings', { params: this.params({ account_id: accountId }) });
+    return this.http.get<Holdings>('/api/client/holdings', {
+      params: this.params({ account_id: accountId }),
+    });
   }
   clientTransactions(q: {
     accountId: number | null;
@@ -66,10 +70,14 @@ export class Api {
     });
   }
   clientGains(accountId: number | null): Observable<Gains> {
-    return this.http.get<Gains>('/api/client/gains', { params: this.params({ account_id: accountId }) });
+    return this.http.get<Gains>('/api/client/gains', {
+      params: this.params({ account_id: accountId }),
+    });
   }
   clientPerformance(accountId: number | null): Observable<Performance> {
-    return this.http.get<Performance>('/api/client/performance', { params: this.params({ account_id: accountId }) });
+    return this.http.get<Performance>('/api/client/performance', {
+      params: this.params({ account_id: accountId }),
+    });
   }
 
   // Advisor portal
@@ -82,7 +90,11 @@ export class Api {
   advisorClientAccounts(clientId: number): Observable<ClientAccounts> {
     return this.http.get<ClientAccounts>(`/api/advisor/clients/${clientId}/accounts`);
   }
-  ask(body: { message: string; conversation_id: string | null; client_id: number | null }): Observable<AssistantReply> {
+  ask(body: {
+    message: string;
+    conversation_id: string | null;
+    client_id: number | null;
+  }): Observable<AssistantReply> {
     return this.http.post<AssistantReply>('/api/advisor/assistant/messages', body);
   }
 }

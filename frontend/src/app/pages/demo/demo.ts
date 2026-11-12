@@ -16,10 +16,13 @@ import { Empty, ErrorState, Icon, Loading } from '../../shared/ui';
     <main id="main" class="mx-auto max-w-4xl px-4 py-10 sm:px-8 sm:py-16">
       <div class="flex items-start justify-between gap-4">
         <div class="space-y-3">
-          <h1 class="text-[1.75rem] font-semibold sm:text-[2.5rem]">Choose who you are in this window</h1>
+          <h1 class="text-[1.75rem] font-semibold sm:text-[2.5rem]">
+            Choose who you are in this window
+          </h1>
           <p class="max-w-[62ch] text-ink-muted">
-            Open the advisor in this window and a client in a private window to see the same accounts from both
-            sides. Each person sees only the accounts they've been given access to.
+            Open the advisor in this window and a client in a private window to see the same
+            accounts from both sides. Each person sees only the accounts they've been given access
+            to.
           </p>
         </div>
         <button
@@ -42,16 +45,25 @@ import { Empty, ErrorState, Icon, Loading } from '../../shared/ui';
             (retry)="users.reload()"
           />
         } @else if (advisors().length + clients().length === 0) {
-          <app-empty message="No demo users yet. Load the seed data with python -m wealth.datagen." />
+          <app-empty
+            message="No demo users yet. Load the seed data with python -m wealth.datagen."
+          />
         } @else {
           <div class="grid gap-8 md:grid-cols-2">
             @for (group of groups(); track group.title) {
               <div>
                 <h3 class="mb-3 flex items-center gap-2 font-semibold">
-                  <span class="inline-block h-4 w-1.5 rounded-[2px]" [class.bg-advisor]="group.kind === 'advisor'" [class.bg-client]="group.kind === 'client'" aria-hidden="true"></span>
+                  <span
+                    class="inline-block h-4 w-1.5 rounded-[2px]"
+                    [class.bg-advisor]="group.kind === 'advisor'"
+                    [class.bg-client]="group.kind === 'client'"
+                    aria-hidden="true"
+                  ></span>
                   {{ group.title }}
                 </h3>
-                <ul class="divide-y divide-rule overflow-hidden rounded-[var(--radius-panel)] border border-rule bg-surface">
+                <ul
+                  class="divide-y divide-rule overflow-hidden rounded-[var(--radius-panel)] border border-rule bg-surface"
+                >
                   @for (u of group.users; track u.kind + u.id) {
                     <li>
                       <button
@@ -74,8 +86,8 @@ import { Empty, ErrorState, Icon, Loading } from '../../shared/ui';
 
       <p class="mt-10 flex max-w-[62ch] items-start gap-2 text-sm text-ink-muted">
         <app-icon name="shield" class="mt-0.5" />
-        This picker exists only in local development. The API checks every request against the account access
-        list, whatever this page sends.
+        This picker exists only in local development. The API checks every request against the
+        account access list, whatever this page sends.
       </p>
     </main>
   `,
@@ -87,8 +99,12 @@ export class Demo {
   protected readonly theme = inject(Theme);
 
   protected readonly users = rxResource({ stream: () => this.api.demoUsers() });
-  protected readonly advisors = computed(() => (this.users.value()?.users ?? []).filter((u) => u.kind === 'advisor'));
-  protected readonly clients = computed(() => (this.users.value()?.users ?? []).filter((u) => u.kind === 'client'));
+  protected readonly advisors = computed(() =>
+    (this.users.value()?.users ?? []).filter((u) => u.kind === 'advisor'),
+  );
+  protected readonly clients = computed(() =>
+    (this.users.value()?.users ?? []).filter((u) => u.kind === 'client'),
+  );
   protected readonly groups = computed(() => [
     { kind: 'advisor', title: 'Advisors', users: this.advisors() },
     { kind: 'client', title: 'Clients', users: this.clients() },

@@ -26,10 +26,14 @@ const advisorShell: ShellData = {
   ],
 };
 
-const comingNext = () => import('./pages/coming-next').then((m) => m.ComingNext);
+const profile = () => import('./pages/profile').then((m) => m.Profile);
 
 export const routes: Routes = [
-  { path: 'demo', title: 'Choose a demo user · AdvisorAgent', loadComponent: () => import('./pages/demo/demo').then((m) => m.Demo) },
+  {
+    path: 'demo',
+    title: 'Choose a demo user · AdvisorAgent',
+    loadComponent: () => import('./pages/demo/demo').then((m) => m.Demo),
+  },
   {
     path: 'client',
     canActivate: [portalGuard('client')],
@@ -37,11 +41,28 @@ export const routes: Routes = [
     loadComponent: () => import('./layout/shell').then((m) => m.Shell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
-      { path: 'dashboard', title: 'Dashboard · Client portal', loadComponent: () => import('./pages/client/dashboard').then((m) => m.ClientDashboard) },
-      { path: 'holdings', title: 'Holdings · Client portal', data: { title: 'Holdings' }, loadComponent: comingNext },
-      { path: 'transactions', title: 'Transactions · Client portal', data: { title: 'Transactions' }, loadComponent: comingNext },
-      { path: 'performance', title: 'Performance · Client portal', data: { title: 'Performance' }, loadComponent: comingNext },
-      { path: 'profile', title: 'Profile · Client portal', data: { title: 'Profile' }, loadComponent: comingNext },
+      {
+        path: 'dashboard',
+        title: 'Dashboard · Client portal',
+        loadComponent: () => import('./pages/client/dashboard').then((m) => m.ClientDashboard),
+      },
+      {
+        path: 'holdings',
+        title: 'Holdings · Client portal',
+        loadComponent: () => import('./pages/client/holdings').then((m) => m.ClientHoldings),
+      },
+      {
+        path: 'transactions',
+        title: 'Transactions · Client portal',
+        loadComponent: () =>
+          import('./pages/client/transactions').then((m) => m.ClientTransactions),
+      },
+      {
+        path: 'performance',
+        title: 'Performance · Client portal',
+        loadComponent: () => import('./pages/client/performance').then((m) => m.ClientPerformance),
+      },
+      { path: 'profile', title: 'Profile · Client portal', loadComponent: profile },
     ],
   },
   {
@@ -51,10 +72,22 @@ export const routes: Routes = [
     loadComponent: () => import('./layout/shell').then((m) => m.Shell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
-      { path: 'dashboard', title: 'Dashboard · Advisor portal', data: { title: 'Dashboard' }, loadComponent: comingNext },
-      { path: 'accounts', title: 'Accounts · Advisor portal', data: { title: 'Accounts' }, loadComponent: comingNext },
-      { path: 'assistant', title: 'Assistant · Advisor portal', data: { title: 'Assistant' }, loadComponent: comingNext },
-      { path: 'profile', title: 'Profile · Advisor portal', data: { title: 'Profile' }, loadComponent: comingNext },
+      {
+        path: 'dashboard',
+        title: 'Dashboard · Advisor portal',
+        loadComponent: () => import('./pages/advisor/dashboard').then((m) => m.AdvisorDashboard),
+      },
+      {
+        path: 'accounts',
+        title: 'Accounts · Advisor portal',
+        loadComponent: () => import('./pages/advisor/accounts').then((m) => m.AdvisorAccounts),
+      },
+      {
+        path: 'assistant',
+        title: 'Assistant · Advisor portal',
+        loadComponent: () => import('./pages/advisor/assistant').then((m) => m.Assistant),
+      },
+      { path: 'profile', title: 'Profile · Advisor portal', loadComponent: profile },
     ],
   },
   {

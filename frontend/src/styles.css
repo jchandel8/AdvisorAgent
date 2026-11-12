@@ -1,6 +1,6 @@
 /* Global styles. Design source of truth: design-system/advisoragent/MASTER.md */
-@import "tailwindcss";
-@import "@fontsource-variable/instrument-sans/wdth.css";
+@import 'tailwindcss';
+@import '@fontsource-variable/instrument-sans/wdth.css';
 
 /* Dark mode follows the data-theme attribute on <html> (set before first paint in index.html). */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
@@ -38,7 +38,7 @@
 }
 
 /* ---- Tokens: dark (re-derived, validated on #18211E) --------------------------------------------- */
-:root[data-theme="dark"] {
+:root[data-theme='dark'] {
   color-scheme: dark;
   --paper: #111816;
   --surface: #18211e;
@@ -70,7 +70,7 @@
 /* Expose tokens to Tailwind utilities (bg-paper, text-ink, border-rule, ...). `inline` keeps them as
    live CSS variables so the theme switch needs no rebuild. */
 @theme inline {
-  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --color-paper: var(--paper);
   --color-surface: var(--surface);
   --color-surface-sunk: var(--surface-sunk);
@@ -117,7 +117,7 @@
   button,
   a,
   select,
-  [role="button"] {
+  [role='button'] {
     cursor: pointer;
   }
 }
@@ -125,7 +125,7 @@
 /* Money and percentages: equal-width digits so columns line up. */
 .num {
   font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: 'tnum' 1;
 }
 /* Dense money tables use the condensed end of the width axis. */
 .ledger {
@@ -139,4 +139,63 @@
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Assistant answers (sanitized Markdown from the model). Tables scroll inside their own box. */
+.answer {
+  line-height: 1.6;
+}
+.answer > * + * {
+  margin-top: 0.75rem;
+}
+.answer h1,
+.answer h2,
+.answer h3 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+}
+.answer ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.answer ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+.answer li + li {
+  margin-top: 0.25rem;
+}
+.answer strong {
+  font-weight: 600;
+}
+.answer code {
+  font-size: 0.875em;
+  background: var(--surface-sunk);
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+}
+.answer table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  font-stretch: 88%;
+}
+.answer th,
+.answer td {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  white-space: nowrap;
+}
+.answer th {
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+.answer a {
+  color: var(--advisor);
+  text-decoration: underline;
 }

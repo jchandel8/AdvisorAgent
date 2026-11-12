@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { Api } from '../../core/api';
-import { accountTypeLabel, dateLong, money, money0, moneyCompact, percent } from '../../core/format';
+import { accountTypeLabel, dateLong, money, money0, percent } from '../../core/format';
 import { Holding } from '../../core/models';
 import { Session } from '../../core/session';
 import { Chart, ChartTable, ChartTokens } from '../../shared/chart';
+import { topHoldingsOption } from '../../shared/holdings-chart';
 import { Empty, ErrorState, Loading, Swatch } from '../../shared/ui';
 
 @Component({
@@ -19,7 +20,8 @@ import { Empty, ErrorState, Loading, Swatch } from '../../shared/ui';
     } @else if (accounts.value(); as a) {
       <header class="max-w-[62ch] space-y-2">
         <h1 class="text-[1.75rem] font-semibold">
-          {{ firstName() }}, your {{ a.account_count }} {{ a.account_count === 1 ? 'account is' : 'accounts are' }} worth
+          {{ firstName() }}, your {{ a.account_count }}
+          {{ a.account_count === 1 ? 'account is' : 'accounts are' }} worth
           <span class="num">{{ money(a.total_market_value) }}</span>.
         </h1>
         <p class="text-ink-muted">Values as of {{ asOf() }}.</p>
@@ -29,7 +31,9 @@ import { Empty, ErrorState, Loading, Swatch } from '../../shared/ui';
         <h2 id="accounts-title" class="mb-3 text-xl font-semibold">Accounts</h2>
         <div class="overflow-x-auto rounded-[var(--radius-panel)] border border-rule bg-surface">
           <table class="ledger w-full min-w-[28rem] text-[0.9375rem]">
-            <caption class="sr-only">Your accounts and their market values</caption>
+            <caption class="sr-only">
+              Your accounts and their market values
+            </caption>
             <thead class="text-left text-sm text-ink-muted">
               <tr>
                 <th scope="col" class="px-5 py-3 font-medium">Account</th>
@@ -44,7 +48,10 @@ import { Empty, ErrorState, Loading, Swatch } from '../../shared/ui';
                 <tr class="border-t border-rule">
                   <th scope="row" class="max-w-64 px-5 py-3 text-left font-medium">
                     <app-swatch [accountId]="acct.account_id" [label]="acct.account_name" />
-                    <span class="mt-0.5 block pl-3.5 text-sm font-normal text-ink-muted md:hidden">{{ acct.owners }}</span>
+                    <span
+                      class="mt-0.5 block pl-3.5 text-sm font-normal text-ink-muted md:hidden"
+                      >{{ acct.owners }}</span
+                    >
                   </th>
                   <td class="px-5 py-3">{{ typeLabel[acct.account_type] }}</td>
                   <td class="hidden px-5 py-3 text-ink-muted md:table-cell">{{ acct.owners }}</td>
@@ -73,7 +80,9 @@ import { Empty, ErrorState, Loading, Swatch } from '../../shared/ui';
         } @else if (holdings.error()) {
           <app-error (retry)="holdings.reload()" />
         } @else if (top10().length === 0) {
-          <app-empty message="No holdings yet. Positions appear here after the first trade settles." />
+          <app-empty
+            message="No holdings yet. Positions appear here after the first trade settles."
+          />
         } @else {
           <div class="rounded-[var(--radius-panel)] border border-rule bg-surface p-5 sm:p-6">
             <app-chart
@@ -102,7 +111,9 @@ export class ClientDashboard {
 
   protected readonly firstName = computed(() => this.session.user()?.name.split(' ')[0] ?? 'Hello');
   protected readonly asOf = computed(() => {
-    const dates = (this.accounts.value()?.accounts ?? []).map((a) => a.as_of_date).filter((d): d is string => !!d);
+    const dates = (this.accounts.value()?.accounts ?? [])
+      .map((a) => a.as_of_date)
+      .filter((d): d is string => !!d);
     return dates.length ? dateLong(dates.sort().at(-1)) : 'today';
   });
 
@@ -121,61 +132,13 @@ export class ClientDashboard {
   protected readonly topTable = computed<ChartTable>(() => ({
     columns: ['Holding', 'Symbol', 'Market value', 'Share of portfolio'],
     numeric: [2, 3],
-    rows: this.top10().map((h) => [h.description, h.symbol, money(h.market_value), percent(h.pct_of_portfolio)]),
+    rows: this.top10().map((h) => [
+      h.description,
+      h.symbol,
+      money(h.market_value),
+      percent(h.pct_of_portfolio),
+    ]),
   }));
 
-  protected readonly buildTop10 = (t: ChartTokens) => {
-    const top = this.top10();
-    return {
-      grid: { left: 8, right: 120, top: 8, bottom: 8, containLabel: true },
-      tooltip: {
-        trigger: 'item',
-        backgroundColor: t.surface,
-        borderColor: t.rule,
-        textStyle: { color: t.ink },
-        formatter: (p: { dataIndex: number }) => {
-          const h = top[p.dataIndex];
-          return `<strong>${h.description}</strong><br/>${money(h.market_value)} · ${percent(h.pct_of_portfolio)} of portfolio`;
-        },
-      },
-      xAxis: {
-        type: 'value',
-        axisLabel: { color: t.muted, formatter: (v: number) => moneyCompact(v) },
-        splitLine: { lineStyle: { color: t.grid } },
-      },
-      yAxis: {
-        type: 'category',
-        inverse: true,
-        data: top.map((h) => h.symbol),
-        axisTick: { show: false },
-        axisLine: { lineStyle: { color: t.rule } },
-        axisLabel: {
-          color: t.ink,
-          formatter: (_: string, i: number) => `{name|${shortName(top[i].description)}} {sym|${top[i].symbol}}`,
-          rich: { name: { color: t.ink, fontWeight: 500 }, sym: { color: t.muted } },
-        },
-      },
-      series: [
-        {
-          type: 'bar',
-          data: top.map((h) => h.market_value),
-          barMaxWidth: 18,
-          itemStyle: { color: t.pos, borderRadius: [0, 4, 4, 0] },
-          label: {
-            show: true,
-            position: 'right',
-            color: t.ink,
-            formatter: (p: { dataIndex: number }) =>
-              `${money0(top[p.dataIndex].market_value)}  ${percent(top[p.dataIndex].pct_of_portfolio)}`,
-          },
-        },
-      ],
-    };
-  };
-}
-
-/** "Microsoft Corp." -> "Microsoft"; keeps axis labels short. The full name is in the tooltip and table. */
-function shortName(description: string): string {
-  const cut = description.replace(/,? (& Co\.|Inc\.|Corp\.|Co\.|plc|Corporation|Company|Class [A-Z]).*$/, '');
-  return cut.length > 22 ? cut.slice(0, 21) + '…' : cut;
+  protected readonly buildTop10 = (t: ChartTokens) => topHoldingsOption(this.top10(), t);
 }

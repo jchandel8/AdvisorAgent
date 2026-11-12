@@ -7,13 +7,23 @@ Handoff notes so work can resume in any session. Update at the end of every step
 | Step | State |
 |---|---|
 | 1. Schema, data generator, tools, terminal agent, access tests | **Done** (2026-11-11), 102 tests passing |
-| 2. FastAPI endpoints + Angular portals (advisor, client) | Not started — wait for owner's go |
+| 2. FastAPI endpoints + Angular portals (advisor, client) | **Done** (2026-11-12): 144 backend + 7 frontend tests |
 | 3. Cognito login, Playwright E2E | Not started |
 | 4. Admin portal, audit log, demo page, reset script | Not started |
 | 5. AWS deploy (ECS Express, RDS, Secrets Manager), IaC, CI | Not started |
 | 6. MCP server, document search, guardrails, evals, tracing, rate limits | Not started |
 
 ## How to run (local)
+
+Whole stack (what the demo uses):
+
+```bash
+docker compose up        # db + api (migrates, seeds if empty, live reload) + web (ng serve with /api proxy)
+# http://localhost:4200  -> Demo page: pick an advisor in a normal window, a client in a private window
+```
+
+Node runs only inside the `web` container (host Node is v12, too old for Angular 22). Run frontend commands
+with `docker compose exec web npx ng build|test`. Backend tools on the host:
 
 ```bash
 docker compose up -d db                     # Postgres 17, database "wealth"
@@ -46,6 +56,17 @@ backend/
   tests/           fixtures.py (hand-built ACL scenario), test_schema, test_access_rules,
                    test_agent_loop (fake model), test_answer_cache, test_generator (pure),
                    test_seeded_db (dev DB)
+  src/wealth/api/   FastAPI: main.py (startup guard), deps.py (demo login, connections), routes_client.py,
+                    routes_advisor.py (assistant endpoint), routes_common.py, queries.py, conversations.py
+  Dockerfile        API image (same image locally and on AWS)
+frontend/           Angular 22 app (zoneless, standalone, signals, strict templates), Tailwind v4, ECharts
+  src/app/core/     api.ts, models.ts, session.ts (demo user + interceptor + guards), theme.ts, format.ts
+  src/app/shared/   ui.ts (icons, swatch, signed values, states), chart.ts (ECharts + table view), filters.ts
+  src/app/layout/   shell.ts (portal rail / bottom tabs)
+  src/app/pages/    demo, client/{dashboard,holdings,transactions,performance}, advisor/{dashboard,accounts,
+                    assistant}, profile
+design-system/advisoragent/MASTER.md   design source of truth (tokens, type, charts, rules)
+.claude/skills/     ui-ux-pro-max (reviewed, MIT) + Anthropic frontend-design, used for all UI work
 demo_users.csv     generated; demo users first (DEMO notes); no passwords
 ```
 
@@ -95,6 +116,26 @@ demo_users.csv     generated; demo users first (DEMO notes); no passwords
   3. No tool-result cache on purpose: DB is 10-21 ms and caching it risks serving data after access is revoked.
 - `get_performance` returns `partial_periods` when some accounts lack a figure (too new), because the
   combined number then covers only the others.
+
+### Step 2 decisions
+- **Viewer** (`access.Viewer(kind, id)`): VISIBLE works for advisors and clients; tools and portal API share
+  the same queries. Client endpoints never take a client_id: scope is the signed-in client (+ optional
+  account_id, 404 if not theirs).
+- **Local demo login**: header `X-Demo-User: advisor:<id>|client:<id>`, only when `DEMO_AUTH_ENABLED=true`;
+  the API refuses to start (and 401s every request) if an AWS runtime marker env var is present
+  (`config.running_on_aws`). Cognito replaces this in step 3 (`deps.current_user` is the one place to change).
+- **Assistant endpoint** `POST /api/advisor/assistant/messages`: conversations stored in `agent_conversations`
+  (history = exact model messages as JSON, transcript = Q/A). No DB connection held during the model call;
+  save uses optimistic locking on `updated_at` (409 on conflict). The selected client is re-checked before
+  every tool round (`access_revoked` stop). Answer cache + prompt caching from step 1 apply.
+- **UI stack** (owner's choices): Tailwind v4 + Angular CDK, Apache ECharts (lazy-loaded, SVG renderer, aria),
+  light default + dark toggle. Every chart has a text summary and "Show as table".
+- **Design** (MASTER.md): account swatches (slot = account_id % 8) are the identity across portals; portal
+  bands (advisor evergreen, client ink blue); statement sentences instead of hero numbers; Instrument Sans
+  with verified tabular figures. Palettes validated with the dataviz validator (green/red failed CVD, so
+  charts use blue/red; green/red only on text with ▲▼ and +/−).
+- Filters and selections live in the URL (`?account=`, `?client=`, `?page=`) for deep links and back button.
+- Generator numbers duplicate account names per owner ("Individual 2").
 - No closed accounts in generated data (closed-account hiding is covered by the test fixture).
 
 ## Data facts (seed 42, anchor 2026-11-11)
@@ -109,6 +150,12 @@ demo split client 10 (advisor 2 sees only some accounts); joint demo client 63. 
 - The example question still makes ~16 tool calls (one per client due). About $0.06 on Sonnet, $0.003 on Haiku; the answer cache makes repeats free. Optional
   step 6 idea: a single "sector exposure across my clients" tool (adds a tool beyond the CLAUDE.md list).
 - On AWS (step 5) with several API containers, the answer cache already works (shared Postgres table).
+- Dev ergonomics: on macOS the web container rebuilds in ~5–15 s; the first use of a new npm dependency
+  triggers a one-time Vite pre-bundle and page reload (a page can look blank until it finishes).
+- CLAUDE.md demo needs a per-user rate limit + daily cap on the assistant endpoint (public demo cost).
+  Not built yet: do it in step 4 (demo hardening) or step 6.
+- Swatches inside assistant answers (MASTER.md idea) are not implemented; answers name accounts in text.
+- Step 3: Playwright E2E for both portals; replace demo header with Cognito JWT verification.
 - Step 2: DB-backed endpoints must reuse `access.VISIBLE` (advisor) and add a client-side equivalent
   (`account_access.client_id`). Add a local-only "pick demo user" setting that cannot be enabled on AWS.
 - **UI (step 2+)**: owner wants a modern, elegant UI built with the `ui-ux-pro-max-skill`
