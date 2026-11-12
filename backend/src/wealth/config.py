@@ -32,6 +32,9 @@ class Settings:
     answer_cache_ttl_hours: float
     answer_cache_max_entries: int
     demo_auth_enabled: bool
+    assistant_per_minute: int
+    assistant_per_day: int
+    assistant_guard_enabled: bool
 
 
 @lru_cache(maxsize=1)
@@ -61,6 +64,10 @@ def get_settings() -> Settings:
         answer_cache_max_entries=int(os.environ.get("ANSWER_CACHE_MAX_ENTRIES", "").strip() or 1000),
         # Local-only stand-in for login (pick a demo user). Off unless explicitly enabled; refused on AWS.
         demo_auth_enabled=os.environ.get("DEMO_AUTH_ENABLED", "false").strip().lower() == "true",
+        # Assistant guardrails: per-advisor limits and the scope check (keep the check on outside tests).
+        assistant_per_minute=int(os.environ.get("ASSISTANT_PER_MINUTE", "").strip() or 10),
+        assistant_per_day=int(os.environ.get("ASSISTANT_PER_DAY", "").strip() or 100),
+        assistant_guard_enabled=os.environ.get("ASSISTANT_GUARD_ENABLED", "true").strip().lower() != "false",
     )
 
 

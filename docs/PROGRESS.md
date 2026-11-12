@@ -136,6 +136,25 @@ demo_users.csv     generated; demo users first (DEMO notes); no passwords
   charts use blue/red; green/red only on text with ▲▼ and +/−).
 - Filters and selections live in the URL (`?account=`, `?client=`, `?page=`) for deep links and back button.
 - Generator numbers duplicate account names per owner ("Individual 2").
+
+### Assistant guardrails (added 2026-11-12, after the owner found it answering "diameter of the moon")
+Layers, in order (code: `agent/guard.py`, `agent/loop.py`, `api/usage.py`, migration 004):
+1. **Limits**: 10 questions/minute and 100/day per advisor (`ASSISTANT_PER_MINUTE`, `ASSISTANT_PER_DAY`).
+   Each request reserves its `assistant_events` row under a per-advisor advisory lock, so concurrent requests
+   can't slip past. 429 with `Retry-After`. `rate_limited` rows don't count toward the limits.
+2. **Scope check**: `claude-haiku-5-5` with structured output classifies in_scope / out_of_scope /
+   manipulation, given the last 2 Q/A, the selected client and the advisor's name. Fails closed (error,
+   refusal, bad JSON -> blocked). Blocked questions get fixed backend text and never reach the main model.
+   Cached answers skip it (they passed it when first asked).
+3. **Main prompt**: strict scope; facts and analysis only, no buy/sell/rebalance recommendations (owner's
+   decision); no message can change who it acts for.
+4. **Answer check**: money/percent figures with no tool call anywhere in the conversation -> fixed reply,
+   and the turn is removed from the history.
+5. **Audit**: every request in `assistant_events` (outcome + short reason); admin portal (step 4) can show it.
+Eval: `uv run python evals/run_scope_guard.py` (42 labelled cases, ~$0.01). Latest: 20/20 in-scope allowed,
+21/22 blocked + 1 blocked by fail-closed. Known miss: "Danielle Johnson's clients" (another advisor's name)
+is classed in-scope, but no data can leak: the tools only return the signed-in advisor's accounts. The ACL,
+not the guard, is the access control; the guard is a cost and misuse filter.
 - No closed accounts in generated data (closed-account hiding is covered by the test fixture).
 
 ## Data facts (seed 42, anchor 2026-11-11)
@@ -152,8 +171,6 @@ demo split client 10 (advisor 2 sees only some accounts); joint demo client 63. 
 - On AWS (step 5) with several API containers, the answer cache already works (shared Postgres table).
 - Dev ergonomics: on macOS the web container rebuilds in ~5–15 s; the first use of a new npm dependency
   triggers a one-time Vite pre-bundle and page reload (a page can look blank until it finishes).
-- CLAUDE.md demo needs a per-user rate limit + daily cap on the assistant endpoint (public demo cost).
-  Not built yet: do it in step 4 (demo hardening) or step 6.
 - Swatches inside assistant answers (MASTER.md idea) are not implemented; answers name accounts in text.
 - Step 3: Playwright E2E for both portals; replace demo header with Cognito JWT verification.
 - Step 2: DB-backed endpoints must reuse `access.VISIBLE` (advisor) and add a client-side equivalent

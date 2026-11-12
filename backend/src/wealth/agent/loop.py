@@ -26,6 +26,7 @@ import psycopg
 
 from wealth.access import Viewer, accessible_client_name
 from wealth.agent.answer_cache import AnswerCache
+from wealth.agent.guard import UNVERIFIED_REPLY, ScopeGuard, unverified_figures
 from wealth.agent.prompts import system_prompt
 from wealth.config import get_settings
 from wealth.db import connection, read_only
@@ -71,6 +72,11 @@ class TurnResult:
     stop_reason: str  # end_turn, max_tokens, refusal, tool_limit, or cache_hit
     tool_calls: list[ToolCall] = field(default_factory=list)
     usage: Usage = field(default_factory=Usage)
+    guard_reason: str | None = None  # why a guardrail blocked the question or answer
+
+    @property
+    def blocked(self) -> bool:
+        return self.stop_reason.startswith("blocked") or self.stop_reason == "guard_error"
 
     @property
     def from_cache(self) -> bool:
@@ -91,12 +97,16 @@ class AdvisorAgent:
         conn: psycopg.Connection | None = None,  # tests pass one; otherwise pool connections are used
         history: list[dict] | None = None,  # resume a stored conversation
         transcript: list[str] | None = None,
+        guard: ScopeGuard | None = None,  # scope check before the main model (None = off, e.g. some tests)
+        advisor_name: str | None = None,  # shown to the scope check so it can spot other advisors' names
     ):
         self.advisor_id = advisor_id
         self.client = client
         self.model = model or get_settings().anthropic_model
         self.today = today or date.today()
         self.cache = cache
+        self.guard = guard
+        self.advisor_name = advisor_name
         self.conn = conn
         # history: exactly what is sent to the model (append-only, JSON-serializable so it can be stored).
         # transcript: questions and final answers only (the answer-cache key).
@@ -133,8 +143,9 @@ class AdvisorAgent:
 
     def ask(self, question: str, *, focus_client_id: int | None = None) -> TurnResult:
         """Answer one question. focus_client_id = the client picked in the UI (verified here, never trusted)."""
+        raw_question, focus_name = question, None
         if focus_client_id is not None:
-            name = self._focus_client_name(focus_client_id)
+            name = focus_name = self._focus_client_name(focus_client_id)
             if name is None:
                 return TurnResult("I can't find that client among the clients you can access.", "not_found")
             question = (
@@ -157,7 +168,32 @@ class AdvisorAgent:
                 self._record(question, cached, [{"type": "text", "text": cached}])
                 return TurnResult(cached, "cache_hit")
 
+        # Guardrail 1: scope check. Cached answers above already passed it when they were first asked.
+        if self.guard is not None:
+            verdict = self.guard.check(
+                raw_question, recent=self.transcript[-4:], focus=focus_name, advisor=self.advisor_name
+            )
+            if not verdict.allowed:
+                stop = {"out_of_scope": "blocked_scope", "manipulation": "blocked_manipulation"}.get(
+                    verdict.category, "guard_error"
+                )
+                return TurnResult(verdict.reply, stop, guard_reason=verdict.reason)
+
+        start_history, start_transcript = len(self.history), len(self.transcript)
         result = self._run_model(question, focus_client_id)
+
+        # Guardrail 2: figures in an answer must come from looked-up data. If not, drop the whole turn
+        # from the history so the model never builds on it, and reply with a fixed message.
+        if result.stop_reason == "end_turn" and unverified_figures(result.text, self._tools_used()):
+            del self.history[start_history:]
+            del self.transcript[start_transcript:]
+            return TurnResult(
+                UNVERIFIED_REPLY,
+                "blocked_unverified",
+                result.tool_calls,
+                result.usage,
+                guard_reason="figures without any data lookup",
+            )
 
         if key is not None and result.stop_reason == "end_turn" and result.text:
             with self._write_conn() as c:
@@ -165,6 +201,15 @@ class AdvisorAgent:
                     c, key, advisor_id=self.advisor_id, model=self.model, answer=result.text, today=self.today
                 )
         return result
+
+    def _tools_used(self) -> bool:
+        """Whether any tool has returned data in this conversation (so figures can come from it)."""
+        return any(
+            isinstance(m.get("content"), list)
+            and any(isinstance(b, dict) and b.get("type") == "tool_result" for b in m["content"])
+            for m in self.history
+            if m.get("role") == "user"
+        )
 
     def _record(self, question: str, answer: str, assistant_content: Any) -> None:
         self.history.append({"role": "user", "content": question})

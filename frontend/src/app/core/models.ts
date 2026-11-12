@@ -185,5 +185,7 @@ export interface AssistantReply {
   answer: string;
   stop_reason: string;
   from_cache: boolean;
+  /** A guardrail stopped the question (off-topic, manipulation) or an unsupported answer. */
+  blocked: boolean;
   tool_calls: ToolCall[];
 }

@@ -19,8 +19,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from wealth.access import ToolContext, accessible_client_name
 from wealth.agent.answer_cache import AnswerCache
+from wealth.agent.guard import ScopeGuard
 from wealth.agent.loop import AdvisorAgent
-from wealth.api import conversations, queries
+from wealth.api import conversations, queries, usage
 from wealth.api.deps import CurrentUser, get_agent_conn, get_conn, get_llm_client, require_advisor
 from wealth.config import get_settings
 from wealth.db import connection
@@ -83,32 +84,68 @@ def _answer_cache() -> AnswerCache | None:
     return AnswerCache(ttl=timedelta(hours=s.answer_cache_ttl_hours), max_entries=s.answer_cache_max_entries)
 
 
+def get_guard(llm: Any = Depends(get_llm_client)) -> ScopeGuard | None:
+    """The scope check (a small, fast model). Tests override it with a fake."""
+    return ScopeGuard(llm) if get_settings().assistant_guard_enabled else None
+
+
 @router.post("/assistant/messages")
 def ask(
     body: AskBody,
     user: CurrentUser = Depends(require_advisor),
     llm: Any = Depends(get_llm_client),
+    guard: ScopeGuard | None = Depends(get_guard),
     agent_conn: psycopg.Connection | None = Depends(get_agent_conn),
     store: Callable = Depends(get_store),
 ):
     advisor_id = user.viewer.id
+    settings = get_settings()
+
+    # Limits first: count and reserve this request before any model call (cost control, misuse).
+    with store() as c:
+        event_id, hit = usage.reserve(
+            c,
+            advisor_id,
+            body.message,
+            per_minute=settings.assistant_per_minute,
+            per_day=settings.assistant_per_day,
+        )
+    if hit is not None:
+        raise HTTPException(429, hit.message, headers={"Retry-After": str(hit.retry_after_seconds)})
+
     history, transcript, updated_at = [], [], None
     if body.conversation_id is not None:
         with store() as c:
             conv = conversations.load(c, body.conversation_id, advisor_id)
         if conv is None:
+            with store() as c:
+                usage.finish(c, event_id, "error", "conversation not found")
             raise HTTPException(404, "Conversation not found.")
         history, transcript, updated_at = conv["history"], conv["transcript"], conv["updated_at"]
 
     agent = AdvisorAgent(
-        advisor_id, llm, cache=_answer_cache(), conn=agent_conn, history=history, transcript=transcript
+        advisor_id,
+        llm,
+        cache=_answer_cache(),
+        conn=agent_conn,
+        history=history,
+        transcript=transcript,
+        guard=guard,
+        advisor_name=user.name,
     )
     try:
         result = agent.ask(body.message, focus_client_id=body.client_id)
     except anthropic.RateLimitError as exc:
+        with store() as c:
+            usage.finish(c, event_id, "error", "upstream rate limit")
         raise HTTPException(429, "The assistant is busy. Try again in a moment.") from exc
     except anthropic.APIError as exc:
+        with store() as c:
+            usage.finish(c, event_id, "error", f"upstream: {type(exc).__name__}")
         raise HTTPException(502, "The assistant is unavailable right now.") from exc
+
+    with store() as c:
+        usage.finish(c, event_id, usage.outcome_for(result.stop_reason), result.guard_reason)
     if result.stop_reason == "not_found":
         raise HTTPException(404, "Client not found.")
 
@@ -140,5 +177,6 @@ def ask(
         "answer": result.text,
         "stop_reason": result.stop_reason,
         "from_cache": result.from_cache,
+        "blocked": result.blocked,
         "tool_calls": [{"name": c.name, "input": c.input, "is_error": c.is_error} for c in result.tool_calls],
     }
