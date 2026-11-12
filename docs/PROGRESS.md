@@ -183,3 +183,11 @@ demo split client 10 (advisor 2 sees only some accounts); joint demo client 63. 
   (https://github.com/nextlevelbuilder/ui-ux-pro-max-skill), possibly combined with other design skills.
   Review that third-party repo before installing it.
 - Step 5: Bedrock client + model ID `anthropic.claude-opus-5-5`; server-side `fallbacks` is not available there.
+- Step 5 cost plan (discussed 2026-11-12, estimates to confirm in the AWS Pricing Calculator): always-on
+  ~$60-90/month + Claude usage (ALB ~$20, Fargate API ~$18, RDS t4g.micro ~$15, public IPv4 ~$7-11, rest small).
+  Owner wants to turn the demo on and off: plan a disposable stack (IaC destroy/deploy, ~$1-3/month while off,
+  ~15 min to bring up) with GitHub Actions "Deploy demo" / "Tear down" buttons and an optional auto-teardown.
+  Keep secrets, ECR images and the Cognito pool; data is re-seeded on each deploy (migrate -> datagen
+  --if-empty -> create Cognito demo users). Avoid a NAT Gateway; serve the Angular build from S3 + CloudFront.
+  RDS auto-restarts after 7 days stopped, so prefer teardown over pause. Serverless (Lambda + Aurora
+  Serverless v2) is the fallback if idle cost matters more than the ECS/RDS portfolio story.
