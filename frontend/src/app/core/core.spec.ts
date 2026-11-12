@@ -1,7 +1,9 @@
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { signal } from '@angular/core';
+import { Router, provideRouter } from '@angular/router';
+import { Auth } from './auth';
 import { dateLong, money, percent, swatchSlot } from './format';
 import { Session, sessionInterceptor } from './session';
 
@@ -77,5 +79,54 @@ describe('format', () => {
     expect(money(null)).toBe('—');
     expect(percent(12.345)).toBe('12.3%');
     expect(dateLong('2026-11-11')).toBe('November 11, 2026');
+  });
+});
+
+describe('sessionInterceptor in cognito mode', () => {
+  const fakeAuth = {
+    mode: signal<'demo' | 'cognito'>('cognito'),
+    accessToken: () => 'header.payload.signature',
+    clear: () => Promise.resolve(),
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([{ path: 'login', children: [] }]),
+        provideHttpClient(withInterceptors([sessionInterceptor])),
+        provideHttpClientTesting(),
+        { provide: Auth, useValue: fakeAuth },
+      ],
+    });
+  });
+
+  it('sends the access token as a Bearer token and never the demo header', () => {
+    TestBed.inject(Session).signIn({ kind: 'advisor', id: 2, name: 'Anthony Gonzalez' });
+    const http = TestBed.inject(HttpClient);
+    const ctl = TestBed.inject(HttpTestingController);
+    http.get('/api/me').subscribe();
+    http.get('https://example.com/other').subscribe();
+    const api = ctl.expectOne('/api/me').request.headers;
+    expect(api.get('Authorization')).toBe('Bearer header.payload.signature');
+    expect(api.has('X-Demo-User')).toBe(false);
+    expect(ctl.expectOne('https://example.com/other').request.headers.has('Authorization')).toBe(
+      false,
+    );
+    ctl.verify();
+  });
+
+  it('goes to /login on 401', async () => {
+    const router = TestBed.inject(Router);
+    const nav = vi.spyOn(router, 'navigateByUrl');
+    TestBed.inject(HttpClient)
+      .get('/api/client/accounts')
+      .subscribe({ error: () => undefined });
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/client/accounts')
+      .flush({}, { status: 401, statusText: 'Unauthorized' });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(nav).toHaveBeenCalledWith('/login');
   });
 });

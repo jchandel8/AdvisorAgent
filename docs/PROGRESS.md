@@ -8,7 +8,7 @@ Handoff notes so work can resume in any session. Update at the end of every step
 |---|---|
 | 1. Schema, data generator, tools, terminal agent, access tests | **Done** (2026-11-11), 102 tests passing |
 | 2. FastAPI endpoints + Angular portals (advisor, client) | **Done** (2026-11-12): 144 backend + 7 frontend tests |
-| 3. Cognito login, Playwright E2E | Not started |
+| 3. Cognito login, Playwright E2E | **Code done** (2026-11-12): 202 backend, 9 frontend, 5 browser tests. Cognito pool not created yet (awaiting owner's permission) |
 | 4. Admin portal, audit log, demo page, reset script | Not started |
 | 5. AWS deploy (ECS Express, RDS, Secrets Manager), IaC, CI | Not started |
 | 6. MCP server, document search, guardrails, evals, tracing, rate limits | Not started |
@@ -69,6 +69,23 @@ design-system/advisoragent/MASTER.md   design source of truth (tokens, type, cha
 .claude/skills/     ui-ux-pro-max (reviewed, MIT) + Anthropic frontend-design, used for all UI work
 demo_users.csv     generated; demo users first (DEMO notes); no passwords
 ```
+
+## Step 3: sign-in (Cognito)
+- `AUTH_MODE=demo|cognito` (config.py). Demo = local picker, refused on AWS. Cognito = `api/cognito.py` verifies
+  the ACCESS token: RS256 via the pool's JWKS (cached), issuer, exp (30 s leeway), `token_use=access`,
+  `client_id`, exactly one group of advisors/clients/admins. Identity: Cognito username == DB username, group ==
+  table. Admin tokens get 403 until step 4.
+- Frontend: `core/auth.ts` reads `/api/auth/config`, then oidc-client-ts authorization code + PKCE through the
+  hosted sign-in page; Bearer token on /api calls; sign-out hits Cognito `/logout`. Pages: /login,
+  /auth/callback. The demo picker exists only in demo mode.
+- Terraform (`infra/persistent`, run with `infra/tf.sh`, Terraform 1.17.2 in Docker, local state for now):
+  Lite user pool, admin-only sign-up, groups, public PKCE app client, hosted domain
+  `advisoragent-<account-id>`. `plan` = 6 to add. NOT applied (owner's rule: ask before any AWS change).
+- `python -m wealth.ops.demo_logins [--apply]`: creates/updates Cognito logins for `demo_users`, password from
+  `DEMO_PASSWORD`. The owner runs it (Claude doesn't create accounts or handle passwords).
+- Playwright (`e2e/`, image v1.64.1, `docker compose --profile e2e run --rm e2e`): demo-mode suite passes;
+  cognito suite (`E2E_AUTH=cognito`) is for the owner after the logins exist.
+- cryptography is pinned <49: newer releases have no Intel-macOS wheels.
 
 ## Key decisions (and why)
 

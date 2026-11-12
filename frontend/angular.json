@@ -62,7 +62,13 @@
               "buildTarget": "frontend:build:development"
             }
           },
-          "defaultConfiguration": "development"
+          "defaultConfiguration": "development",
+          "options": {
+            "allowedHosts": [
+              "web",
+              "localhost"
+            ]
+          }
         },
         "test": {
           "builder": "@angular/build:unit-test"

@@ -19,7 +19,11 @@ def check_startup_config() -> None:
     settings = get_settings()
     if settings.demo_auth_enabled and running_on_aws():
         raise RuntimeError(
-            "DEMO_AUTH_ENABLED=true is a local-only setting and is not allowed on AWS. Use Cognito login."
+            "AUTH_MODE=demo is a local-only setting and is not allowed on AWS. Use Cognito login."
+        )
+    if settings.auth_mode == "cognito" and not (settings.cognito_issuer and settings.cognito_client_id):
+        raise RuntimeError(
+            "AUTH_MODE=cognito needs COGNITO_REGION, COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID."
         )
 
 

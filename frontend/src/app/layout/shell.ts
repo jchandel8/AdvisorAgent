@@ -8,6 +8,7 @@ import {
   RouterOutlet,
 } from '@angular/router';
 import { map } from 'rxjs';
+import { Auth } from '../core/auth';
 import { Session } from '../core/session';
 import { Theme } from '../core/theme';
 import { Icon, IconName } from '../shared/ui';
@@ -89,7 +90,9 @@ export interface ShellData {
               (click)="switchUser()"
             >
               <app-icon name="switch" />
-              <span class="hidden sm:inline">Switch user</span>
+              <span class="hidden sm:inline">{{
+                auth.mode() === 'cognito' ? 'Sign out' : 'Switch user'
+              }}</span>
             </button>
             <button
               type="button"
@@ -142,6 +145,7 @@ export class Shell {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly session = inject(Session);
+  protected readonly auth = inject(Auth);
   protected readonly theme = inject(Theme);
 
   protected readonly data = toSignal(this.route.data.pipe(map((d) => d as ShellData)), {
@@ -151,6 +155,10 @@ export class Shell {
   protected readonly user = this.session.user;
 
   protected switchUser(): void {
+    if (this.auth.mode() === 'cognito') {
+      void this.auth.logout(); // ends the app session and Cognito's hosted session
+      return;
+    }
     this.session.signOut();
     void this.router.navigateByUrl('/demo');
   }

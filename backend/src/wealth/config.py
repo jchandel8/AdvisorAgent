@@ -31,10 +31,24 @@ class Settings:
     answer_cache_enabled: bool
     answer_cache_ttl_hours: float
     answer_cache_max_entries: int
-    demo_auth_enabled: bool
+    auth_mode: str  # "demo" (local picker) or "cognito" (verified JWT)
+    cognito_region: str | None
+    cognito_user_pool_id: str | None
+    cognito_client_id: str | None
+    cognito_domain: str | None  # managed login domain, e.g. advisoragent-123.auth.us-west-1.amazoncognito.com
     assistant_per_minute: int
     assistant_per_day: int
     assistant_guard_enabled: bool
+
+    @property
+    def demo_auth_enabled(self) -> bool:
+        return self.auth_mode == "demo"
+
+    @property
+    def cognito_issuer(self) -> str | None:
+        if self.cognito_region and self.cognito_user_pool_id:
+            return f"https://cognito-idp.{self.cognito_region}.amazonaws.com/{self.cognito_user_pool_id}"
+        return None
 
 
 @lru_cache(maxsize=1)
@@ -62,13 +76,26 @@ def get_settings() -> Settings:
         answer_cache_enabled=os.environ.get("ANSWER_CACHE_ENABLED", "true").strip().lower() != "false",
         answer_cache_ttl_hours=float(os.environ.get("ANSWER_CACHE_TTL_HOURS", "").strip() or 24),
         answer_cache_max_entries=int(os.environ.get("ANSWER_CACHE_MAX_ENTRIES", "").strip() or 1000),
-        # Local-only stand-in for login (pick a demo user). Off unless explicitly enabled; refused on AWS.
-        demo_auth_enabled=os.environ.get("DEMO_AUTH_ENABLED", "false").strip().lower() == "true",
+        # demo = local-only user picker (refused on AWS); cognito = Cognito access tokens only.
+        auth_mode=_auth_mode(),
+        cognito_region=os.environ.get("COGNITO_REGION", "").strip() or None,
+        cognito_user_pool_id=os.environ.get("COGNITO_USER_POOL_ID", "").strip() or None,
+        cognito_client_id=os.environ.get("COGNITO_CLIENT_ID", "").strip() or None,
+        cognito_domain=os.environ.get("COGNITO_DOMAIN", "").strip() or None,
         # Assistant guardrails: per-advisor limits and the scope check (keep the check on outside tests).
         assistant_per_minute=int(os.environ.get("ASSISTANT_PER_MINUTE", "").strip() or 10),
         assistant_per_day=int(os.environ.get("ASSISTANT_PER_DAY", "").strip() or 100),
         assistant_guard_enabled=os.environ.get("ASSISTANT_GUARD_ENABLED", "true").strip().lower() != "false",
     )
+
+
+def _auth_mode() -> str:
+    mode = os.environ.get("AUTH_MODE", "").strip().lower()
+    if not mode:  # backward compatible with the step 2 setting
+        mode = "demo" if os.environ.get("DEMO_AUTH_ENABLED", "").strip().lower() == "true" else "cognito"
+    if mode not in ("demo", "cognito"):
+        raise RuntimeError(f"AUTH_MODE must be 'demo' or 'cognito', not {mode!r}")
+    return mode
 
 
 # Environment variables that AWS sets inside ECS tasks, Lambda and other managed runtimes.
