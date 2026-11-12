@@ -95,8 +95,24 @@ def test_entries_expire_at_local_midnight(conn):
     cache = AnswerCache(ttl=timedelta(days=7), clock=clock)
     make(conn, A1, answered(), cache)[0].ask(QUESTION)
     expires = conn.execute("SELECT expires_at FROM answer_cache").fetchone()["expires_at"]
-    local_midnight = datetime.combine(TODAY + timedelta(days=1), datetime.min.time()).astimezone()
+    local_now = clock.now.astimezone()
+    local_midnight = datetime.combine(
+        local_now.date() + timedelta(days=1), datetime.min.time(), tzinfo=local_now.tzinfo
+    )
     assert expires == local_midnight
+
+
+def test_pinned_past_data_date_still_caches(conn):
+    # DATA_ANCHOR_DATE pins `today` to a past day; entries must still live until the real next midnight.
+    clock = Clock()
+    clock.now = datetime.combine(TODAY + timedelta(days=3), datetime.min.time(), tzinfo=UTC) + timedelta(
+        hours=12
+    )
+    cache = AnswerCache(clock=clock)
+    make(conn, A1, answered(), cache)[0].ask(QUESTION)
+    a, client = make(conn, A1, [], cache)
+    assert a.ask(QUESTION).from_cache
+    assert client.requests == []
 
 
 def test_least_recently_used_entries_are_evicted(conn):

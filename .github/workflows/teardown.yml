@@ -1,0 +1,39 @@
+# "Tear down" button: destroys infra/app (database + ECS service + load balancer) to stop the monthly cost.
+# Cognito, the image registry and the secrets (infra/persistent) are kept. The next deploy re-seeds the data.
+name: Tear down demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type DESTROY to delete the database and the running app
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: aws-demo
+  cancel-in-progress: false
+
+jobs:
+  teardown:
+    if: ${{ inputs.confirm == 'DESTROY' }}
+    runs-on: ubuntu-latest
+    environment: demo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-west-1
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.17.2
+          terraform_wrapper: false
+      - name: Destroy infra/app
+        working-directory: infra/app
+        run: |
+          terraform init -input=false -backend-config="bucket=${{ vars.TFSTATE_BUCKET }}"
+          terraform destroy -input=false -auto-approve -var "image_tag=unused"

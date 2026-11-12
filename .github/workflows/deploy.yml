@@ -1,0 +1,52 @@
+# "Deploy demo" button (Actions tab -> Deploy demo -> Run workflow). Builds the image, pushes it to ECR and
+# applies infra/app (database + ECS Express service). The container migrates, seeds an empty database and
+# creates the demo logins on start. Prints the app URL at the end.
+name: Deploy demo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # GitHub OIDC -> short-lived AWS credentials (no stored keys)
+  contents: read
+
+concurrency:
+  group: aws-demo
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-west-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: demo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push the image
+        run: |
+          IMAGE="${{ steps.ecr.outputs.registry }}/advisoragent:${GITHUB_SHA}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.17.2
+          terraform_wrapper: false
+
+      - name: Apply infra/app
+        working-directory: infra/app
+        run: |
+          terraform init -input=false -backend-config="bucket=${{ vars.TFSTATE_BUCKET }}"
+          terraform apply -input=false -auto-approve -var "image_tag=${GITHUB_SHA}"
+          echo "### App URL" >> "$GITHUB_STEP_SUMMARY"
+          terraform output -raw APP_URL >> "$GITHUB_STEP_SUMMARY"

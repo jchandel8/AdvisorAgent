@@ -10,7 +10,7 @@ Handoff notes so work can resume in any session. Update at the end of every step
 | 2. FastAPI endpoints + Angular portals (advisor, client) | **Done** (2026-11-12): 144 backend + 7 frontend tests |
 | 3. Cognito login, Playwright E2E | **Done** (2026-11-12). Cognito pool `us-west-1_yZ66inLgw` created with the owner's permission. Owner still to run `wealth.ops.demo_logins --apply` |
 | 4. Admin portal, audit log, demo page, reset script | **Done** (2026-11-12): 227 backend, 9 frontend, 6 browser tests |
-| 5. AWS deploy (ECS Express, RDS, Secrets Manager), IaC, CI | Not started |
+| 5. AWS deploy (ECS Express, RDS, Secrets Manager), IaC, CI | **Code done, not applied** (2026-11-12): Dockerfile, Terraform (bootstrap, persistent additions, app), CI/Deploy/Teardown workflows. Nothing created on AWS beyond Cognito; every apply waits for the owner's yes |
 | 6. MCP server, document search, guardrails, evals, tracing, rate limits | Not started |
 
 ## How to run (local)
@@ -103,6 +103,32 @@ demo_users.csv     generated; demo users first (DEMO notes); no passwords
   logins when AUTH_MODE=cognito. Admin-created Cognito logins are left in the pool.
 - E2E covers the CLAUDE.md demo script: admin grants Anthony account 19, he sees 3 of Kevin's accounts,
   admin revokes, back to 2, both in the audit log.
+
+## Step 5: AWS deploy (code written, NOT applied)
+
+Nothing below exists on AWS yet except the Cognito pool. Every `apply` needs the owner's explicit yes.
+
+- `Dockerfile` (repo root): multi-stage; builds Angular, serves it from FastAPI (`STATIC_DIR`), runs
+  `backend/scripts/start.sh` (migrate -> `datagen --if-empty` -> `demo_logins --apply` when cognito and
+  `DEMO_PASSWORD` set -> uvicorn `--proxy-headers`). Image `advisoragent:local` smoke-tested locally.
+- `config.py`: if `DATABASE_URL` is empty, builds it from `DB_HOST/DB_USER/DB_PASSWORD/DB_NAME/DB_PORT`
+  with `sslmode=require` (RDS-managed secret injects the password). Tested in `test_deploy_config.py`.
+- Terraform (run with `infra/tf.sh`, Terraform 1.17.2 in Docker, AWS provider 6.73), three stacks:
+  1. `infra/bootstrap` (local state): tfstate S3 bucket, GitHub OIDC provider, deploy role
+     `advisoragent-github-deploy` (main branch only; AdministratorAccess for now; tighten later). Plan: 7 to add.
+  2. `infra/persistent` (local state): Cognito (applied) + NEW ECR repo `advisoragent` and secrets
+     `advisoragent/anthropic-api-key`, `advisoragent/demo-password` (values put by the owner, not in TF). Plan: 4 to add.
+  3. `infra/app` (S3 backend): default VPC (no NAT), RDS Postgres 17 db.t4g.micro private,
+     ECS Express Mode service (port 8000, health `/api/health`, 0.5 vCPU / 1 GB, 1 task), IAM roles, logs.
+     Output `APP_URL`. Destroyed by Teardown; persistent stack kept.
+- Workflows: `ci.yml` (ruff, pytest with Postgres service, frontend test+build), `deploy.yml` (manual;
+  OIDC -> ECR push -> terraform apply -> prints APP_URL), `teardown.yml` (manual; type DESTROY).
+  Need repo variables `AWS_DEPLOY_ROLE_ARN`, `TFSTATE_BUCKET` and a GitHub environment `demo`.
+- After the first deploy: add `APP_URL` to `app_urls` in `infra/persistent` and re-apply so Cognito
+  accepts callbacks from the AWS URL.
+- Unverified risk: Express Mode tasks in the default VPC need a public IP for internet access (Anthropic
+  API, Secrets Manager, ECR) since there is no NAT. Check on first deploy.
+- Bedrock is not used yet; the app still calls the Anthropic API with the key from Secrets Manager.
 
 ## Key decisions (and why)
 

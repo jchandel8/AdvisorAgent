@@ -4,8 +4,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&display=swap">
 <style>
-  /* Layout: one wide request-flow diagram with playable journeys, then reference sections for the AI agent.
-     Tokens follow the project's design system (design-system/advisoragent/MASTER.md). */
+  /* Layout: a wide request-flow diagram with playable journeys, an AWS deployment figure, then reference
+     sections for the AI agent. Tokens follow the project's design system (design-system/advisoragent/MASTER.md). */
   :root {
     --paper: #f6f7f5;
     --surface: #ffffff;
@@ -16,9 +16,11 @@
     --line: #9aa6a1;
     --advisor: #0e5a4a;
     --client: #2e3a8c;
+    --admin: #3e4652;
     --ai: #8a5a00;
     --ai-soft: #fbf3e2;
     --ai-line: #c58b1e;
+    --aws: #b35c00;
     --blocked: #a3261b;
     --focus: #1d5fd1;
     --font: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -26,14 +28,16 @@
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --paper: #111816; --surface: #18211e; --sunk: #141c19; --ink: #e6ece9; --muted: #a3b0ab;
-      --rule: #2c3833; --line: #5b6a64; --advisor: #5fbfa6; --client: #9faaf5; --ai: #e8b45a;
-      --ai-soft: #2a2416; --ai-line: #c58b1e; --blocked: #f08a7e; --focus: #7aa7ff; color-scheme: dark;
+      --rule: #2c3833; --line: #5b6a64; --advisor: #5fbfa6; --client: #9faaf5; --admin: #c3cad6;
+      --ai: #e8b45a; --ai-soft: #2a2416; --ai-line: #c58b1e; --aws: #f0a95a; --blocked: #f08a7e;
+      --focus: #7aa7ff; color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
     --paper: #111816; --surface: #18211e; --sunk: #141c19; --ink: #e6ece9; --muted: #a3b0ab;
-    --rule: #2c3833; --line: #5b6a64; --advisor: #5fbfa6; --client: #9faaf5; --ai: #e8b45a;
-    --ai-soft: #2a2416; --ai-line: #c58b1e; --blocked: #f08a7e; --focus: #7aa7ff; color-scheme: dark;
+    --rule: #2c3833; --line: #5b6a64; --advisor: #5fbfa6; --client: #9faaf5; --admin: #c3cad6;
+    --ai: #e8b45a; --ai-soft: #2a2416; --ai-line: #c58b1e; --aws: #f0a95a; --blocked: #f08a7e;
+    --focus: #7aa7ff; color-scheme: dark;
   }
 
   body { background: var(--paper); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.55; }
@@ -49,10 +53,10 @@
   h2 { font-size: 1.375rem; font-weight: 600; }
   h3 { font-size: 1.0625rem; font-weight: 600; }
   p { margin: 0; }
-  .lede { max-width: 68ch; color: var(--muted); margin-top: 12px; }
+  .lede { max-width: 70ch; color: var(--muted); margin-top: 12px; }
   .lede strong { color: var(--ink); font-weight: 600; }
+  code { font-size: 0.875em; background: var(--sunk); padding: 0.05em 0.35em; border-radius: 4px; }
 
-  /* Diagram ------------------------------------------------------------------------------------------- */
   .stage { display: grid; gap: 16px; }
   .controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
   .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -67,8 +71,9 @@
   .btns { display: flex; gap: 8px; }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-  .canvas { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; overflow-x: auto; }
+  .canvas { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; overflow-x: auto; margin: 0; }
   .canvas svg { display: block; width: 100%; min-width: 860px; height: auto; }
+  figcaption.cap { color: var(--muted); font-size: 0.9375rem; max-width: 80ch; margin-top: 10px; }
 
   svg text { font-family: var(--font); fill: var(--ink); }
   svg .t { font-size: 14px; font-weight: 600; }
@@ -77,16 +82,20 @@
   svg .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; }
   svg .zone-api { fill: var(--sunk); stroke: var(--line); stroke-width: 1.25; stroke-dasharray: 6 5; }
   svg .zone-ai { fill: var(--ai-soft); stroke: var(--ai-line); stroke-width: 1.5; }
+  svg .zone-vpc { fill: none; stroke: var(--aws); stroke-width: 1.25; stroke-dasharray: 6 5; }
   svg .ai-title { fill: var(--ai); font-size: 15px; font-weight: 700; }
+  svg .aws-title { fill: var(--aws); font-size: 12.5px; font-weight: 700; }
   svg .box-ai { fill: var(--surface); stroke: var(--ai-line); stroke-width: 1.25; }
+  svg .box-aws { fill: var(--surface); stroke: var(--aws); stroke-width: 1.25; }
   svg .box-adv { stroke: var(--advisor); stroke-width: 1.75; }
   svg .box-cli { stroke: var(--client); stroke-width: 1.75; }
+  svg .box-adm { stroke: var(--admin); stroke-width: 1.75; }
   svg .band-adv { fill: var(--advisor); }
   svg .band-cli { fill: var(--client); }
+  svg .band-adm { fill: var(--admin); }
   svg .edge { fill: none; stroke: var(--line); stroke-width: 1.5; }
   svg .edge.dash { stroke-dasharray: 4 4; }
   svg .arrowhead { fill: var(--line); }
-  svg .node { transition: opacity .25s; }
   svg .node.on .box, svg .node.on .box-ai { stroke: var(--packet, var(--ink)); stroke-width: 2.5; }
   svg .edge.on { stroke: var(--packet, var(--ink)); stroke-width: 2.5; }
   svg .packet { fill: var(--packet, var(--ink)); }
@@ -96,9 +105,7 @@
     display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start;
     background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 20px;
   }
-  .now .num {
-    font-variant-numeric: tabular-nums; font-weight: 700; min-width: 2ch; color: var(--packet, var(--ink));
-  }
+  .now .num { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 2ch; color: var(--packet, var(--ink)); }
   .steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; counter-reset: s; }
   .steps li {
     counter-increment: s; display: grid; grid-template-columns: 2.25rem 1fr; gap: 8px; padding: 8px 12px;
@@ -109,13 +116,8 @@
   .steps li.on { background: var(--sunk); color: var(--ink); }
   .steps li.on::before { color: var(--packet, var(--ink)); }
   .steps li.done { color: var(--ink); }
-  .steps code, .card code, td code { font-size: 0.875em; background: var(--sunk); padding: 0.05em 0.35em; border-radius: 4px; }
 
-  /* Reference sections ---------------------------------------------------------------------------------- */
-  .agent {
-    border: 1.5px solid var(--ai-line); background: var(--ai-soft); border-radius: 12px; padding: 24px;
-    display: grid; gap: 24px;
-  }
+  .agent { border: 1.5px solid var(--ai-line); background: var(--ai-soft); border-radius: 12px; padding: 24px; display: grid; gap: 24px; }
   .agent-head { display: grid; gap: 8px; }
   .agent-head .tag { color: var(--ai); font-weight: 700; }
   .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
@@ -138,11 +140,13 @@
   <header>
     <h1>AdvisorAgent architecture</h1>
     <p class="lede">
-      Two web portals and one AI assistant share a single backend. Everything an advisor or client sees, including
-      every lookup the AI makes, goes through one <strong>access layer</strong> that reads only accounts the signed-in
-      person has an <code>account_access</code> row for. The <strong>AI agent</strong> (ochre) lives inside the
-      backend: it can ask for data through six read-only tools, but it never sees who it is acting for and never
-      touches the database directly.
+      Three web portals (advisor, client, admin) and one AI assistant share a single backend. People sign in
+      with <strong>Amazon Cognito</strong>; the backend reads who you are only from the verified token. Everything an
+      advisor or client sees, including every lookup the AI makes, goes through one <strong>access layer</strong> that
+      reads only accounts the signed-in person has an <code>account_access</code> row for. The <strong>AI agent</strong>
+      (ochre) lives inside the backend: it asks for data through six read-only tools, never sees who it acts for, and
+      never touches the database directly. <strong>Admins</strong> change who can see what; every change is written to
+      an audit log in the same transaction.
     </p>
   </header>
 
@@ -150,9 +154,10 @@
     <h2 id="flow-title">Follow a request</h2>
     <div class="controls">
       <div class="tabs" role="group" aria-label="Choose a request to follow">
-        <button class="tab" type="button" data-scenario="client" id="tab-client"><span class="dot" style="background: var(--client)"></span>Client opens Holdings</button>
-        <button class="tab" type="button" data-scenario="ask" id="tab-ask"><span class="dot" style="background: var(--advisor)"></span>Advisor asks the assistant</button>
-        <button class="tab" type="button" data-scenario="blocked" id="tab-blocked"><span class="dot" style="background: var(--blocked)"></span>Off-topic question is blocked</button>
+        <button class="tab" type="button" data-scenario="client"><span class="dot" style="background: var(--client)"></span>Client signs in and opens Holdings</button>
+        <button class="tab" type="button" data-scenario="ask"><span class="dot" style="background: var(--advisor)"></span>Advisor asks the assistant</button>
+        <button class="tab" type="button" data-scenario="blocked"><span class="dot" style="background: var(--blocked)"></span>Off-topic question is blocked</button>
+        <button class="tab" type="button" data-scenario="grant"><span class="dot" style="background: var(--admin)"></span>Admin grants access</button>
       </div>
       <div class="btns">
         <button class="btn" type="button" id="play">Pause</button>
@@ -160,33 +165,34 @@
       </div>
     </div>
 
-    <figure class="canvas" style="margin:0">
-      <svg viewBox="0 0 1200 620" role="img" id="diagram"
-        aria-label="Advisor and client portals call an Angular app, which calls the FastAPI backend. Inside the backend, a sign-in check routes portal requests to the portal endpoints and assistant requests to the AI agent: limits and audit log, a scope check using Claude Haiku 5.5, the agent loop using Claude Sonnet 5.5, and six read-only tools. Both the portal endpoints and the tools read Postgres only through the access layer.">
+    <figure class="canvas">
+      <svg viewBox="0 0 1200 660" role="img" id="diagram"
+        aria-label="Advisor, client and admin portals run in the browser as one Angular app. People sign in on Amazon Cognito's hosted page; the app sends the token with every API call. In the FastAPI backend, a sign-in check routes requests to the assistant endpoint, the admin endpoints or the portal endpoints. The AI agent zone holds limits and audit log, a scope check using Claude Haiku 5.5, the agent loop using Claude Sonnet 5.5, and six read-only tools. Portal endpoints and tools read Postgres only through the access layer. Admin endpoints write grants and the audit log to Postgres in one transaction.">
         <defs>
           <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0 0 L10 5 L0 10 z" class="arrowhead" />
           </marker>
         </defs>
 
-        <!-- Trusted backend container -->
-        <rect class="zone-api" x="430" y="20" width="510" height="580" rx="14" />
+        <rect class="zone-api" x="430" y="20" width="510" height="625" rx="14" />
         <text class="t" x="450" y="44">FastAPI backend</text>
-        <text class="s" x="450" y="60">trusted zone · identity comes from the session, never from the model</text>
+        <text class="s" x="450" y="60">trusted zone · identity comes from the verified token, never from the model</text>
 
-        <!-- AI agent zone -->
         <rect class="zone-ai" x="670" y="74" width="255" height="320" rx="12" />
         <text class="ai-title" x="690" y="98">AI agent</text>
 
-        <!-- Edges (drawn under nodes). ids are used by the animation. -->
         <g id="edges">
-          <path id="p1" class="edge" d="M190 150 C215 150 215 230 240 230" marker-end="url(#ah)" />
-          <path id="p2" class="edge" d="M190 340 C215 340 215 262 240 262" marker-end="url(#ah)" />
-          <path id="p3" class="edge" d="M390 245 C420 245 420 105 460 105" marker-end="url(#ah)" />
+          <path id="p1" class="edge" d="M190 185 C215 185 215 280 240 280" marker-end="url(#ah)" />
+          <path id="p2" class="edge" d="M190 335 C215 335 215 305 240 305" marker-end="url(#ah)" />
+          <path id="pA" class="edge" d="M190 485 C215 485 215 330 240 330" marker-end="url(#ah)" />
+          <path id="pL" class="edge" d="M315 250 L315 122" marker-end="url(#ah)" />
+          <path id="p3" class="edge" d="M390 290 C420 290 420 105 460 105" marker-end="url(#ah)" />
           <path id="p4" class="edge" d="M545 130 L545 168" marker-end="url(#ah)" />
-          <path id="p5" class="edge" d="M460 122 L446 122 L446 412 L460 412" marker-end="url(#ah)" />
+          <path id="p5" class="edge" d="M460 122 L446 122 L446 413 L460 413" marker-end="url(#ah)" />
+          <path id="pX" class="edge" d="M460 122 L446 122 L446 295 L460 295" marker-end="url(#ah)" />
           <path id="p6" class="edge" d="M545 438 L545 478" marker-end="url(#ah)" />
-          <path id="p7" class="edge" d="M630 186 C660 186 660 134 690 134" marker-end="url(#ah)" />
+          <path id="pD" class="edge" d="M460 308 L438 308 L438 615 L980 615" marker-end="url(#ah)" />
+          <path id="p7" class="edge" d="M630 193 C660 193 660 134 690 134" marker-end="url(#ah)" />
           <path id="p8" class="edge" d="M800 158 L800 174" marker-end="url(#ah)" />
           <path id="p9" class="edge" d="M910 196 C945 196 945 170 980 170" marker-end="url(#ah)" />
           <path id="p10" class="edge" d="M800 222 L800 238" marker-end="url(#ah)" />
@@ -194,56 +200,71 @@
           <path id="p12" class="edge" d="M800 292 L800 312" marker-end="url(#ah)" />
           <path id="p13" class="edge" d="M800 368 L800 478" marker-end="url(#ah)" />
           <path id="p14" class="edge" d="M920 516 C950 516 950 500 980 500" marker-end="url(#ah)" />
-          <path id="p16" class="edge" d="M690 268 C655 268 655 200 630 200" marker-end="url(#ah)" />
+          <path id="p16" class="edge" d="M690 268 C655 268 655 208 630 208" marker-end="url(#ah)" />
           <path id="p17" class="edge dash" d="M910 140 C960 140 960 440 980 450" marker-end="url(#ah)" />
         </g>
 
-        <!-- Edge labels -->
-        <text class="lbl" x="398" y="160" text-anchor="middle" transform="rotate(-90 398 160)">/api + signed-in user</text>
-        <text class="lbl" x="452" y="300" transform="rotate(-90 452 300)" text-anchor="middle">portal pages</text>
+        <text class="lbl" x="322" y="190">sign-in redirect</text>
+        <text class="lbl" x="400" y="140" text-anchor="middle" transform="rotate(-90 400 140)">/api + token</text>
         <text class="lbl" x="553" y="153">chat</text>
         <text class="lbl" x="953" y="166" text-anchor="middle">classify</text>
         <text class="lbl" x="953" y="226" text-anchor="middle">tool use</text>
-        <text class="lbl" x="664" y="232" text-anchor="end">answer</text>
+        <text class="lbl" x="664" y="236" text-anchor="end">answer</text>
         <text class="lbl" x="808" y="430">tool calls</text>
         <text class="lbl" x="952" y="538" text-anchor="middle">SQL</text>
         <text class="lbl" x="966" y="380" text-anchor="end">events</text>
+        <text class="lbl" x="700" y="608" text-anchor="middle">grant or revoke + audit row, one transaction</text>
 
         <!-- Browsers -->
         <g class="node" id="n_adv">
-          <rect class="box box-adv" x="20" y="110" width="170" height="80" rx="10" />
-          <rect class="band-adv" x="20" y="110" width="8" height="80" rx="3" />
-          <text class="t" x="40" y="142">Advisor portal</text>
-          <text class="s" x="40" y="160">browser, normal window</text>
-          <text class="s" x="40" y="176">/advisor</text>
+          <rect class="box box-adv" x="20" y="150" width="170" height="70" rx="10" />
+          <rect class="band-adv" x="20" y="150" width="8" height="70" rx="3" />
+          <text class="t" x="40" y="180">Advisor portal</text>
+          <text class="s" x="40" y="198">/advisor · assistant chat</text>
         </g>
         <g class="node" id="n_cli">
-          <rect class="box box-cli" x="20" y="300" width="170" height="80" rx="10" />
-          <rect class="band-cli" x="20" y="300" width="8" height="80" rx="3" />
-          <text class="t" x="40" y="332">Client portal</text>
-          <text class="s" x="40" y="350">browser, private window</text>
-          <text class="s" x="40" y="366">/client</text>
+          <rect class="box box-cli" x="20" y="300" width="170" height="70" rx="10" />
+          <rect class="band-cli" x="20" y="300" width="8" height="70" rx="3" />
+          <text class="t" x="40" y="330">Client portal</text>
+          <text class="s" x="40" y="348">/client · own accounts only</text>
+        </g>
+        <g class="node" id="n_adm">
+          <rect class="box box-adm" x="20" y="450" width="170" height="70" rx="10" />
+          <rect class="band-adm" x="20" y="450" width="8" height="70" rx="3" />
+          <text class="t" x="40" y="480">Admin portal</text>
+          <text class="s" x="40" y="498">/admin · users, access, logs</text>
         </g>
 
-        <!-- Angular -->
+        <g class="node" id="n_cognito">
+          <rect class="box" x="240" y="40" width="150" height="82" rx="10" style="stroke: var(--aws)" />
+          <text class="t" x="254" y="66">Amazon Cognito</text>
+          <text class="s" x="254" y="84">hosted sign-in page</text>
+          <text class="s" x="254" y="100">groups: advisors,</text>
+          <text class="s" x="254" y="114">clients, admins</text>
+        </g>
+
         <g class="node" id="n_web">
-          <rect class="box" x="240" y="195" width="150" height="100" rx="10" />
-          <text class="t" x="256" y="225">Angular app</text>
-          <text class="s" x="256" y="244">web container</text>
-          <text class="s" x="256" y="260">screens, charts, chat</text>
-          <text class="s" x="256" y="276">no security logic</text>
+          <rect class="box" x="240" y="250" width="150" height="110" rx="10" />
+          <text class="t" x="256" y="278">Angular app</text>
+          <text class="s" x="256" y="296">one app, three portals</text>
+          <text class="s" x="256" y="312">sends the token</text>
+          <text class="s" x="256" y="328">no security logic</text>
         </g>
 
-        <!-- Backend inner nodes -->
         <g class="node" id="n_auth">
           <rect class="box" x="460" y="80" width="170" height="50" rx="8" />
           <text class="t" x="474" y="101">Sign-in check</text>
-          <text class="s" x="474" y="118">who + role (Cognito: step 3)</text>
+          <text class="s" x="474" y="118">verifies the Cognito token</text>
         </g>
         <g class="node" id="n_assist">
           <rect class="box" x="460" y="168" width="170" height="50" rx="8" />
           <text class="t" x="474" y="189">Assistant endpoint</text>
           <text class="s" x="474" y="206">loads/saves conversation</text>
+        </g>
+        <g class="node" id="n_admin">
+          <rect class="box" x="460" y="270" width="170" height="50" rx="8" />
+          <text class="t" x="474" y="291">Admin endpoints</text>
+          <text class="s" x="474" y="308">users, accounts, access</text>
         </g>
         <g class="node" id="n_portal">
           <rect class="box" x="460" y="388" width="170" height="50" rx="8" />
@@ -253,11 +274,10 @@
         <g class="node" id="n_access">
           <rect class="box" x="460" y="478" width="460" height="76" rx="10" />
           <text class="t" x="476" y="502">Access layer · “visible accounts”</text>
-          <text class="s" x="476" y="521">every query joins account_access for the signed-in person</text>
+          <text class="s" x="476" y="521">every read joins account_access for the signed-in person</text>
           <text class="s" x="476" y="538">(and the selected client, when one is chosen in the assistant)</text>
         </g>
 
-        <!-- AI agent nodes -->
         <g class="node" id="n_limits">
           <rect class="box-ai" x="690" y="110" width="220" height="48" rx="8" />
           <text class="t" x="704" y="131">Limits and audit log</text>
@@ -281,7 +301,6 @@
           <text class="s" x="704" y="363">the model never supplies advisor_id</text>
         </g>
 
-        <!-- External: Anthropic -->
         <g class="node" id="n_claude">
           <rect class="box" x="980" y="120" width="200" height="150" rx="10" />
           <text class="t" x="996" y="146">Anthropic API</text>
@@ -293,21 +312,21 @@
           <text class="s" x="996" y="256">tool use and answers</text>
         </g>
 
-        <!-- Postgres -->
         <g class="node" id="n_db">
-          <rect class="box" x="980" y="400" width="200" height="200" rx="10" />
+          <rect class="box" x="980" y="400" width="200" height="240" rx="10" />
           <text class="t" x="996" y="426">Postgres</text>
-          <text class="s" x="996" y="444">RDS on AWS (step 5)</text>
+          <text class="s" x="996" y="444">RDS on AWS, Docker locally</text>
           <line x1="996" y1="456" x2="1164" y2="456" stroke="var(--rule)" />
           <text class="s" x="996" y="476">account_access (the ACL)</text>
           <text class="s" x="996" y="493">accounts, holdings,</text>
           <text class="s" x="996" y="510">transactions, performance</text>
-          <text class="s" x="996" y="530">agent_conversations</text>
-          <text class="s" x="996" y="547">answer_cache</text>
-          <text class="s" x="996" y="564">assistant_events</text>
+          <text class="s" x="996" y="530">advisors, clients, admins</text>
+          <text class="s" x="996" y="547">permission_audit</text>
+          <text class="s" x="996" y="567">agent_conversations</text>
+          <text class="s" x="996" y="584">answer_cache</text>
+          <text class="s" x="996" y="601">assistant_events</text>
         </g>
 
-        <!-- Moving packet -->
         <g id="packet" aria-hidden="true" style="visibility:hidden">
           <circle class="halo" r="12" />
           <circle class="packet" r="6" />
@@ -324,8 +343,80 @@
     <div class="legend" aria-label="Legend">
       <span><span class="sw" style="background: var(--ai-soft); border: 1.5px solid var(--ai-line)"></span>AI agent</span>
       <span><span class="sw" style="background: var(--sunk); border: 1.25px dashed var(--line)"></span>Trusted backend</span>
+      <span><span class="sw" style="border: 1.5px solid var(--aws)"></span>AWS service</span>
       <span><span class="sw" style="border-top: 2px dashed var(--line); height: 0; width: 22px"></span>audit write</span>
     </div>
+  </section>
+
+  <section class="stage" aria-labelledby="aws-title">
+    <h2 id="aws-title">How it runs on AWS</h2>
+    <figure class="canvas">
+      <svg viewBox="0 0 1200 380" role="img"
+        aria-label="GitHub Actions pushes the image to ECR and applies Terraform. Browsers sign in with Cognito and reach the app through the ECS Express load balancer over HTTPS. One container serves the API, the AI agent and the Angular app; it reads secrets from Secrets Manager at start, talks to RDS Postgres inside the default VPC, and calls the Anthropic API.">
+        <defs>
+          <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" class="arrowhead" />
+          </marker>
+        </defs>
+
+        <rect class="zone-vpc" x="225" y="128" width="750" height="130" rx="12" />
+        <text class="aws-title" x="242" y="148">Default VPC · us-west-1 (no NAT Gateway)</text>
+
+        <path class="edge" d="M190 50 L470 50" marker-end="url(#ah2)" />
+        <path class="edge" d="M190 200 L240 200" marker-end="url(#ah2)" />
+        <path class="edge" d="M105 230 L105 300 L240 300" marker-end="url(#ah2)" />
+        <path class="edge" d="M420 200 L470 200" marker-end="url(#ah2)" />
+        <path class="edge" d="M585 82 L585 165" marker-end="url(#ah2)" />
+        <path class="edge" d="M810 82 L700 172" marker-end="url(#ah2)" />
+        <path class="edge" d="M700 210 L750 210" marker-end="url(#ah2)" />
+        <path class="edge" d="M585 245 L585 300" marker-end="url(#ah2)" />
+
+        <text class="lbl" x="330" y="42" text-anchor="middle">push image</text>
+        <text class="lbl" x="215" y="192" text-anchor="middle">HTTPS</text>
+        <text class="lbl" x="150" y="292" text-anchor="middle">sign in</text>
+        <text class="lbl" x="445" y="192" text-anchor="middle">:8000</text>
+        <text class="lbl" x="593" y="125">pull image</text>
+        <text class="lbl" x="770" y="116">inject at start</text>
+        <text class="lbl" x="725" y="202" text-anchor="middle">SQL</text>
+        <text class="lbl" x="593" y="280">Claude API</text>
+
+        <g><rect class="box" x="20" y="20" width="170" height="64" rx="10" />
+          <text class="t" x="34" y="44">GitHub Actions</text>
+          <text class="s" x="34" y="62">tests on every push;</text>
+          <text class="s" x="34" y="76">Deploy / Tear down buttons</text></g>
+        <g><rect class="box" x="20" y="170" width="170" height="60" rx="10" />
+          <text class="t" x="34" y="196">Browsers</text>
+          <text class="s" x="34" y="214">advisor, client, admin</text></g>
+        <g><rect class="box-aws" x="470" y="20" width="230" height="62" rx="10" />
+          <text class="t" x="484" y="44">ECR</text>
+          <text class="s" x="484" y="62">image registry (kept on teardown)</text></g>
+        <g><rect class="box-aws" x="720" y="20" width="250" height="62" rx="10" />
+          <text class="t" x="734" y="44">Secrets Manager</text>
+          <text class="s" x="734" y="62">DB password, Anthropic key, demo password</text></g>
+        <g><rect class="box-aws" x="240" y="170" width="180" height="60" rx="10" />
+          <text class="t" x="254" y="194">ECS Express</text>
+          <text class="s" x="254" y="212">load balancer, HTTPS URL</text></g>
+        <g><rect class="box-aws" x="470" y="165" width="230" height="80" rx="10" />
+          <text class="t" x="484" y="188">One container (Fargate)</text>
+          <text class="s" x="484" y="206">API + AI agent + Angular app</text>
+          <text class="s" x="484" y="222">start: migrate, seed if empty,</text>
+          <text class="s" x="484" y="236">create demo logins</text></g>
+        <g><rect class="box-aws" x="750" y="165" width="210" height="80" rx="10" />
+          <text class="t" x="764" y="188">RDS Postgres 17</text>
+          <text class="s" x="764" y="206">db.t4g.micro, encrypted,</text>
+          <text class="s" x="764" y="222">not publicly reachable</text></g>
+        <g><rect class="box-aws" x="240" y="280" width="180" height="60" rx="10" />
+          <text class="t" x="254" y="304">Amazon Cognito</text>
+          <text class="s" x="254" y="322">kept on teardown</text></g>
+        <g><rect class="box" x="470" y="300" width="230" height="60" rx="10" />
+          <text class="t" x="484" y="324">Anthropic API</text>
+          <text class="s" x="484" y="342">Haiku 5.5 and Sonnet 5.5</text></g>
+      </svg>
+    </figure>
+    <figcaption class="cap">
+      Tear down deletes the VPC contents shown inside the dashed box (database, service, load balancer). ECR,
+      Secrets Manager and Cognito stay, so the next Deploy is about 15 minutes and re-seeds the same demo data.
+    </figcaption>
   </section>
 
   <section class="agent" aria-labelledby="agent-title">
@@ -372,17 +463,35 @@
           <li><strong>Facts only:</strong> no buy or sell recommendations.</li>
           <li><strong>Selected client:</strong> a hard scope in the access layer.</li>
           <li><strong>Answer check:</strong> figures must come from looked-up data.</li>
-          <li><strong>Audit log:</strong> every request, with its outcome.</li>
+          <li><strong>Audit log:</strong> every request, with its outcome, shown in the admin portal.</li>
         </ul>
       </div>
       <div class="card">
         <h3>What it can never do</h3>
         <ul>
-          <li>Choose or change who it acts for. <code>advisor_id</code> comes from the session.</li>
+          <li>Choose or change who it acts for. The advisor comes from the verified Cognito token.</li>
           <li>Write SQL or touch the database. It only calls the six tools.</li>
           <li>Change data. Tools run in read-only transactions.</li>
           <li>See accounts without an <code>account_access</code> row. Unknown and forbidden IDs look identical.</li>
         </ul>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="portals-title" style="display:grid; gap:16px">
+    <h2 id="portals-title">The three portals</h2>
+    <div class="grid">
+      <div class="card">
+        <h3 style="color: var(--client)">Client portal</h3>
+        <p>Dashboard, holdings, transactions and gains, performance, profile. Only the client's own accounts; joint accounts appear for both owners.</p>
+      </div>
+      <div class="card">
+        <h3 style="color: var(--advisor)">Advisor portal</h3>
+        <p>Client book, a client's shared accounts, the AI assistant, profile. Only accounts the advisor has an access row for.</p>
+      </div>
+      <div class="card">
+        <h3 style="color: var(--admin)">Admin portal</h3>
+        <p>Create users (database row and Cognito login together), create accounts, grant and revoke access, read the audit log and the assistant log. Admins manage access; they don't read portfolios.</p>
       </div>
     </div>
   </section>
@@ -392,15 +501,16 @@
     <div class="tablewrap">
       <table>
         <thead>
-          <tr><th scope="col">Part</th><th scope="col">Locally today (<code>docker compose up</code>)</th><th scope="col">On AWS (build step 5)</th></tr>
+          <tr><th scope="col">Part</th><th scope="col">Locally (<code>docker compose up</code>)</th><th scope="col">On AWS (build step 5)</th></tr>
         </thead>
         <tbody>
-          <tr><td>Angular app</td><td><code>web</code> container, <code>ng serve</code> on port 4200</td><td>Static build behind the same domain</td></tr>
-          <tr><td>FastAPI + AI agent</td><td><code>api</code> container, port 8000, live reload</td><td>ECS Express Mode, same image</td></tr>
-          <tr><td>Sign-in</td><td>Demo user picker (refused on AWS)</td><td>Cognito: advisors, clients, admins groups</td></tr>
-          <tr><td>Database</td><td><code>db</code> container, Postgres 17</td><td>RDS Postgres</td></tr>
-          <tr><td>Secrets</td><td><code>.env</code>, never committed</td><td>Secrets Manager</td></tr>
-          <tr><td>Claude</td><td>Anthropic API</td><td>Anthropic API or Amazon Bedrock</td></tr>
+          <tr><td>Angular app</td><td><code>web</code> container, <code>ng serve</code> on port 4200</td><td>Built into the app container, served by FastAPI</td></tr>
+          <tr><td>FastAPI + AI agent</td><td><code>api</code> container, port 8000, live reload</td><td>ECS Express Mode (Fargate), one container, HTTPS URL</td></tr>
+          <tr><td>Sign-in</td><td>Demo picker or Cognito (<code>AUTH_MODE</code>)</td><td>Cognito only (demo picker refused on AWS)</td></tr>
+          <tr><td>Database</td><td><code>db</code> container, Postgres 17</td><td>RDS Postgres 17, private to the VPC</td></tr>
+          <tr><td>Secrets</td><td><code>.env</code>, never committed</td><td>Secrets Manager, injected when the container starts</td></tr>
+          <tr><td>Deploy</td><td>n/a</td><td>GitHub Actions with keyless AWS access (OIDC); Terraform</td></tr>
+          <tr><td>Claude</td><td>Anthropic API</td><td>Anthropic API</td></tr>
         </tbody>
       </table>
     </div>
@@ -409,16 +519,16 @@
 
 <script>
 (() => {
-  // Each step lights a node and moves the packet along one or more edges ([edgeId, reverse]).
   const SCENARIOS = {
     client: {
       color: 'var(--client)',
       steps: [
-        { node: 'n_cli', edges: [['p2']], text: 'Shelby Moody opens Holdings in the client portal.' },
-        { node: 'n_web', edges: [['p3']], text: 'The Angular app calls <code>/api/client/holdings</code> with the signed-in user. The browser never sends a client ID.' },
-        { node: 'n_auth', edges: [['p5']], text: 'The sign-in check confirms Shelby exists and is a client. Advisor routes would return 403.' },
-        { node: 'n_portal', edges: [['p6']], text: 'The holdings endpoint scopes to Shelby herself. An account ID that is not hers returns 404.' },
-        { node: 'n_access', edges: [['p14']], text: 'The access layer reads only accounts with an <code>account_access</code> row for Shelby, in a read-only transaction.' },
+        { node: 'n_cli', edges: [['p2']], text: 'Kevin Keith opens the client portal and selects Sign in.' },
+        { node: 'n_cognito', edges: [['pL']], text: 'The app sends him to the Cognito sign-in page. The password never touches the app.' },
+        { node: 'n_web', edges: [['pL', true]], text: 'Cognito returns a signed token. The app keeps it and sends it with every API call.' },
+        { node: 'n_auth', edges: [['p3']], text: 'The sign-in check verifies the token (signature, expiry, app, group) and finds Kevin by username.' },
+        { node: 'n_portal', edges: [['p5']], text: 'The holdings endpoint scopes to Kevin himself. The browser never sends a client ID.' },
+        { node: 'n_access', edges: [['p6'], ['p14']], text: 'The access layer reads only accounts with an <code>account_access</code> row for Kevin, read-only.' },
         { node: 'n_cli', edges: [['p14', true], ['p6', true], ['p5', true], ['p3', true], ['p2', true]], text: 'Positions, sector mix and totals (computed in SQL) return to the page and its charts.' },
       ],
     },
@@ -426,15 +536,15 @@
       color: 'var(--advisor)',
       steps: [
         { node: 'n_adv', edges: [['p1']], text: 'Anthony asks: “Which of my clients are overweight in tech and have a review due this month?”' },
-        { node: 'n_auth', edges: [['p3']], text: 'The sign-in check confirms Anthony is an advisor.' },
+        { node: 'n_auth', edges: [['p3']], text: 'The sign-in check verifies his token: he is in the advisors group.' },
         { node: 'n_assist', edges: [['p4']], text: 'The assistant endpoint loads the conversation from Postgres.' },
-        { node: 'n_limits', edges: [['p7'], ['p17']], text: '<strong>AI agent:</strong> limits check (10 a minute, 100 a day) and an audit row in <code>assistant_events</code>.' },
-        { node: 'n_scope', edges: [['p8'], ['p9'], ['p9', true]], text: '<strong>AI agent:</strong> Claude Haiku 5.5 classifies the question as in scope (fixed JSON format).' },
+        { node: 'n_limits', edges: [['p7'], ['p17']], text: '<strong>AI agent:</strong> limits check and an audit row in <code>assistant_events</code>.' },
+        { node: 'n_scope', edges: [['p8'], ['p9'], ['p9', true]], text: '<strong>AI agent:</strong> Claude Haiku 5.5 classifies the question as in scope.' },
         { node: 'n_loop', edges: [['p10'], ['p11']], text: '<strong>AI agent:</strong> the loop sends the question and six tool definitions to Claude Sonnet 5.5. Nothing in them says who Anthony is.' },
         { node: 'n_loop', edges: [['p11', true]], text: 'Sonnet replies with tool calls: <code>find_reviews_due</code>, then <code>get_holdings</code> for each client, Technology only.' },
-        { node: 'n_tools', edges: [['p12'], ['p13'], ['p14']], text: '<strong>AI agent:</strong> the backend runs each tool as Anthony, through the access layer. Only his accounts are readable.' },
+        { node: 'n_tools', edges: [['p12'], ['p13'], ['p14']], text: '<strong>AI agent:</strong> the backend runs each tool as Anthony, through the access layer.' },
         { node: 'n_loop', edges: [['p14', true], ['p13', true], ['p12', true], ['p11']], text: 'Results go back to Sonnet, which writes the answer.' },
-        { node: 'n_loop', edges: [['p11', true]], text: '<strong>AI agent:</strong> answer check: figures must come from looked-up data. The answer is cached and the conversation saved.' },
+        { node: 'n_loop', edges: [['p11', true]], text: '<strong>AI agent:</strong> answer check, then the answer is cached and the conversation saved.' },
         { node: 'n_adv', edges: [['p16'], ['p4', true], ['p3', true], ['p1', true]], text: 'The answer appears in the chat with a list of every lookup it used.' },
       ],
     },
@@ -445,7 +555,18 @@
         { node: 'n_assist', edges: [['p3'], ['p4']], text: 'Signed in as an advisor; the request reaches the assistant endpoint.' },
         { node: 'n_limits', edges: [['p7'], ['p17']], text: '<strong>AI agent:</strong> the request is counted and logged.' },
         { node: 'n_scope', edges: [['p8'], ['p9'], ['p9', true]], text: '<strong>AI agent:</strong> Claude Haiku 5.5 classifies it as out of scope.' },
-        { node: 'n_adv', edges: [['p7', true], ['p4', true], ['p3', true], ['p1', true]], text: 'The backend returns a fixed reply. Sonnet is never called, nothing is cached, and the event is logged as <code>blocked_scope</code>.' },
+        { node: 'n_adv', edges: [['p7', true], ['p4', true], ['p3', true], ['p1', true]], text: 'A fixed reply comes back. Sonnet is never called, and the admin sees it in the Assistant log.' },
+      ],
+    },
+    grant: {
+      color: 'var(--admin)',
+      steps: [
+        { node: 'n_adm', edges: [['pA']], text: 'Morgan (admin) opens Permissions for Kevin Keith’s third account and grants Anthony advisor access.' },
+        { node: 'n_auth', edges: [['p3']], text: 'The sign-in check verifies Morgan’s token: she is in the admins group.' },
+        { node: 'n_admin', edges: [['pX']], text: 'The admin endpoint checks the rules (account open, role fits, not a duplicate).' },
+        { node: 'n_db', edges: [['pD']], text: 'One transaction writes the new <code>account_access</code> row and a <code>permission_audit</code> row: who, what, when.' },
+        { node: 'n_adm', edges: [['pD', true], ['pX', true], ['p3', true], ['pA', true]], text: 'The admin portal shows “Granted Anthony Gonzalez advisor access”.' },
+        { node: 'n_adv', edges: [['p1'], ['p3'], ['p5'], ['p6'], ['p14']], text: 'On his next page load, Anthony’s access layer includes the account: he now sees 3 of Kevin’s accounts, and so can the assistant.' },
       ],
     },
   };
@@ -463,14 +584,11 @@
   let scenario = 'ask';
   let index = 0;
   let playing = !reduceMotion;
-  let token = 0; // cancels an in-flight animation when the user changes something
-
+  let token = 0;
   const PX_PER_MS = 0.32;
   const HOLD_MS = 1300;
 
-  function clearHighlights() {
-    svg.querySelectorAll('.on').forEach((el) => el.classList.remove('on'));
-  }
+  const clearHighlights = () => svg.querySelectorAll('.on').forEach((el) => el.classList.remove('on'));
 
   function renderSteps() {
     const s = SCENARIOS[scenario];
@@ -479,7 +597,7 @@
     s.steps.forEach((step, i) => {
       const li = document.createElement('li');
       const span = document.createElement('span');
-      span.innerHTML = step.text; // one grid cell, so bold and code stay inline
+      span.innerHTML = step.text;
       li.appendChild(span);
       li.tabIndex = 0;
       li.addEventListener('click', () => go(i, false));
@@ -491,10 +609,7 @@
 
   function markStep(i) {
     const s = SCENARIOS[scenario];
-    [...stepsEl.children].forEach((li, j) => {
-      li.classList.toggle('on', j === i);
-      li.classList.toggle('done', j < i);
-    });
+    [...stepsEl.children].forEach((li, j) => { li.classList.toggle('on', j === i); li.classList.toggle('done', j < i); });
     nowNum.textContent = String(i + 1);
     nowText.innerHTML = s.steps[i].text;
     clearHighlights();
@@ -508,21 +623,19 @@
       if (!path) return resolve();
       path.classList.add('on');
       const len = path.getTotalLength();
+      packet.style.visibility = 'visible';
       if (reduceMotion) {
         const p = path.getPointAtLength(reverse ? 0 : len);
         packet.setAttribute('transform', `translate(${p.x} ${p.y})`);
-        packet.style.visibility = 'visible';
         return resolve();
       }
       const dur = Math.max(260, len / PX_PER_MS);
       const start = performance.now();
-      packet.style.visibility = 'visible';
       const frame = (now) => {
         if (my !== token) return resolve();
         const t = Math.min(1, (now - start) / dur);
         const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-        const d = (reverse ? 1 - eased : eased) * len;
-        const p = path.getPointAtLength(d);
+        const p = path.getPointAtLength((reverse ? 1 - eased : eased) * len);
         packet.setAttribute('transform', `translate(${p.x} ${p.y})`);
         if (t < 1) requestAnimationFrame(frame); else resolve();
       };
@@ -538,18 +651,20 @@
     }
   }
 
-  function wait(ms, my) {
-    return new Promise((r) => setTimeout(() => r(my === token), ms));
-  }
+  const wait = (ms, my) => new Promise((r) => setTimeout(() => r(my === token), ms));
 
   async function loop(my) {
     while (playing && my === token) {
       await runStep(index, my);
       if (!(await wait(HOLD_MS, my))) return;
-      const total = SCENARIOS[scenario].steps.length;
-      index = (index + 1) % total;
+      index = (index + 1) % SCENARIOS[scenario].steps.length;
       if (index === 0 && !(await wait(900, my))) return;
     }
+  }
+
+  function updatePlay() {
+    playBtn.textContent = playing ? 'Pause' : 'Play';
+    playBtn.setAttribute('aria-pressed', String(!playing));
   }
 
   function go(i, keepPlaying = playing) {
@@ -561,26 +676,15 @@
     if (playing) loop(my); else runStep(index, my);
   }
 
-  function setScenario(name) {
-    scenario = name;
-    renderSteps();
-    go(0, !reduceMotion);
-  }
-
-  function updatePlay() {
-    playBtn.textContent = playing ? 'Pause' : 'Play';
-    playBtn.setAttribute('aria-pressed', String(!playing));
-  }
-
-  tabs.forEach((t) => t.addEventListener('click', () => setScenario(t.dataset.scenario)));
+  tabs.forEach((t) => t.addEventListener('click', () => { scenario = t.dataset.scenario; renderSteps(); go(0, !reduceMotion); }));
   playBtn.addEventListener('click', () => {
     if (playing) { playing = false; token++; updatePlay(); markStep(index); }
-    else { go(index, true); playing = !reduceMotion; if (reduceMotion) go((index + 1) % SCENARIOS[scenario].steps.length, false); }
+    else go(index, true);
   });
   nextBtn.addEventListener('click', () => go((index + 1) % SCENARIOS[scenario].steps.length, false));
 
   renderSteps();
-  if (reduceMotion) { playBtn.textContent = 'Next'; playBtn.hidden = true; }
+  if (reduceMotion) playBtn.hidden = true;
   go(0, !reduceMotion);
 })();
 </script>
