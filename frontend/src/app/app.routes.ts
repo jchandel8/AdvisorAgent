@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { Router, Routes } from '@angular/router';
-import { Session, portalGuard } from './core/session';
+import { Auth } from './core/auth';
+import { Session, demoModeGuard, portalGuard, signInPath } from './core/session';
 import { ShellData } from './layout/shell';
 
 const clientShell: ShellData = {
@@ -31,8 +32,19 @@ const profile = () => import('./pages/profile').then((m) => m.Profile);
 export const routes: Routes = [
   {
     path: 'demo',
+    canActivate: [demoModeGuard],
     title: 'Choose a demo user · AdvisorAgent',
     loadComponent: () => import('./pages/demo/demo').then((m) => m.Demo),
+  },
+  {
+    path: 'login',
+    title: 'Sign in · AdvisorAgent',
+    loadComponent: () => import('./pages/login').then((m) => m.Login),
+  },
+  {
+    path: 'auth/callback',
+    title: 'Signing in · AdvisorAgent',
+    loadComponent: () => import('./pages/login').then((m) => m.AuthCallback),
   },
   {
     path: 'client',
@@ -95,7 +107,7 @@ export const routes: Routes = [
     // Signed in: go to your portal. Otherwise: choose a demo user.
     redirectTo: () => {
       const user = inject(Session).user();
-      return inject(Router).parseUrl(user ? `/${user.kind}` : '/demo');
+      return inject(Router).parseUrl(user ? `/${user.kind}` : signInPath(inject(Auth)));
     },
   },
 ];
