@@ -94,7 +94,12 @@ class AnswerCache:
         self, conn: psycopg.Connection, key: str, *, advisor_id: int, model: str, answer: str, today: date
     ):
         now = self.clock()
-        next_midnight = datetime.combine(today + timedelta(days=1), time.min).astimezone()  # local midnight
+        # Next local midnight by the real clock. Not by `today`: that can be a pinned data date in the past
+        # (DATA_ANCHOR_DATE), which would make every entry expire as soon as it is written.
+        local_now = now.astimezone()
+        next_midnight = datetime.combine(
+            local_now.date() + timedelta(days=1), time.min, tzinfo=local_now.tzinfo
+        )
         expires = min(now + self.ttl, next_midnight)
         conn.execute(
             """INSERT INTO answer_cache (cache_key, advisor_id, model, answer, created_at, last_used_at, expires_at)

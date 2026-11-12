@@ -11,3 +11,6 @@ output "COGNITO_CLIENT_ID" {
 output "COGNITO_DOMAIN" {
   value = "${aws_cognito_user_pool_domain.hosted.domain}.auth.${var.region}.amazoncognito.com"
 }
+output "ECR_REPOSITORY_URL" {
+  value = aws_ecr_repository.app.repository_url
+}

@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass
 from datetime import date
 from functools import lru_cache
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from dotenv import find_dotenv, load_dotenv
 
@@ -56,7 +56,7 @@ def get_settings() -> Settings:
     # usecwd=True searches upward from the working directory, so running from backend/ finds ../.env.
     load_dotenv(find_dotenv(usecwd=True), override=False)
 
-    database_url = os.environ.get("DATABASE_URL", "").strip()
+    database_url = os.environ.get("DATABASE_URL", "").strip() or _database_url_from_parts()
     if not database_url:
         raise RuntimeError("DATABASE_URL is not set. Copy .env.example to .env and fill it in.")
 
@@ -87,6 +87,19 @@ def get_settings() -> Settings:
         assistant_per_day=int(os.environ.get("ASSISTANT_PER_DAY", "").strip() or 100),
         assistant_guard_enabled=os.environ.get("ASSISTANT_GUARD_ENABLED", "true").strip().lower() != "false",
     )
+
+
+def _database_url_from_parts() -> str:
+    """On AWS the password comes from the RDS-managed secret (injected as DB_PASSWORD), so the URL is
+    assembled here instead of being stored anywhere. sslmode=require: RDS traffic is encrypted."""
+    host = os.environ.get("DB_HOST", "").strip()
+    if not host:
+        return ""
+    user = quote(os.environ.get("DB_USER", "").strip(), safe="")
+    password = quote(os.environ.get("DB_PASSWORD", ""), safe="")
+    port = os.environ.get("DB_PORT", "5432").strip()
+    name = os.environ.get("DB_NAME", "wealth").strip()
+    return f"postgresql://{user}:{password}@{host}:{port}/{name}?sslmode=require"
 
 
 def _auth_mode() -> str:
