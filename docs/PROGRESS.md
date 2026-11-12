@@ -8,8 +8,8 @@ Handoff notes so work can resume in any session. Update at the end of every step
 |---|---|
 | 1. Schema, data generator, tools, terminal agent, access tests | **Done** (2026-11-11), 102 tests passing |
 | 2. FastAPI endpoints + Angular portals (advisor, client) | **Done** (2026-11-12): 144 backend + 7 frontend tests |
-| 3. Cognito login, Playwright E2E | **Code done** (2026-11-12): 202 backend, 9 frontend, 5 browser tests. Cognito pool not created yet (awaiting owner's permission) |
-| 4. Admin portal, audit log, demo page, reset script | Not started |
+| 3. Cognito login, Playwright E2E | **Done** (2026-11-12). Cognito pool `us-west-1_yZ66inLgw` created with the owner's permission. Owner still to run `wealth.ops.demo_logins --apply` |
+| 4. Admin portal, audit log, demo page, reset script | **Done** (2026-11-12): 227 backend, 9 frontend, 6 browser tests |
 | 5. AWS deploy (ECS Express, RDS, Secrets Manager), IaC, CI | Not started |
 | 6. MCP server, document search, guardrails, evals, tracing, rate limits | Not started |
 
@@ -86,6 +86,23 @@ demo_users.csv     generated; demo users first (DEMO notes); no passwords
 - Playwright (`e2e/`, image v1.64.1, `docker compose --profile e2e run --rm e2e`): demo-mode suite passes;
   cognito suite (`E2E_AUTH=cognito`) is for the owner after the logins exist.
 - cryptography is pinned <49: newer releases have no Intel-macOS wheels.
+
+## Step 4: admin portal
+- Migration 005: `admins`, `demo_users.admin_id`, `permission_audit` (append-only; written in the SAME
+  transaction as each change). Demo admin: `morgan.lee` (fixed, not Faker, so other data is unchanged).
+- Sign-in: `admin:<id>` demo header / Cognito `admins` group -> `admins` table. `CurrentUser(kind, id, name)`;
+  `.viewer` only for advisors/clients; `require_admin`.
+- API `/api/admin/*` (routes_admin.py): users (list, create = DB row + Cognito login in the right group with
+  DEMO_PASSWORD; login failure rolls back the insert), accounts (list, create with owners + advisors),
+  access (list, grant, revoke; an account keeps >= 1 client owner and >= 1 advisor), people search, audit log,
+  assistant log. Admins manage access; they don't read portfolios.
+- UI `/admin` (slate band): Users, Accounts, Permissions (two-step revoke), Audit log, Assistant log.
+- Demo page works in both modes: picker in demo mode; usernames + "Sign in" in cognito mode.
+  `/api/demo/users` is public (usernames, never passwords).
+- Reset: `python -m wealth.ops.reset --yes` = reload all data (clears conversations, cache, logs) + demo
+  logins when AUTH_MODE=cognito. Admin-created Cognito logins are left in the pool.
+- E2E covers the CLAUDE.md demo script: admin grants Anthony account 19, he sees 3 of Kevin's accounts,
+  admin revokes, back to 2, both in the audit log.
 
 ## Key decisions (and why)
 

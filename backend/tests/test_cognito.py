@@ -143,7 +143,8 @@ def test_identity_comes_from_the_token(cognito_api):
 
 def test_demo_header_is_ignored_in_cognito_mode(cognito_api):
     assert cognito_api.get("/api/me", headers={"X-Demo-User": f"advisor:{A1}"}).status_code == 401
-    assert cognito_api.get("/api/demo/users").status_code == 404
+    # The demo user list is public information (usernames, no passwords), so it stays readable.
+    assert cognito_api.get("/api/demo/users").status_code == 200
 
 
 def test_group_decides_the_portal(cognito_api):
@@ -171,9 +172,11 @@ def test_bad_or_missing_tokens_are_401(cognito_api):
     assert cognito_api.get("/api/me", headers=bearer(token(username="nobody"))).status_code == 403
 
 
-def test_admins_wait_for_step_4(cognito_api):
-    t = token(**{"cognito:groups": ["admins"], "username": "admin1"})
-    assert cognito_api.get("/api/me", headers=bearer(t)).status_code == 403
+def test_admin_token_opens_the_admin_portal(cognito_api):
+    t = token(**{"cognito:groups": ["admins"], "username": "admin901"})
+    assert cognito_api.get("/api/me", headers=bearer(t)).json()["portal"] == "/admin"
+    unknown = token(**{"cognito:groups": ["admins"], "username": "admin1"})
+    assert cognito_api.get("/api/me", headers=bearer(unknown)).status_code == 403
 
 
 def test_auth_config_is_public_and_secret_free(cognito_api):

@@ -24,7 +24,7 @@ from wealth.api.cognito import NotSetUp, TokenError, signing_key, verify_access_
 from wealth.config import get_settings, running_on_aws
 from wealth.db import connection, read_only
 
-DEMO_HEADER = re.compile(r"^(advisor|client):([1-9][0-9]{0,8})$")
+DEMO_HEADER = re.compile(r"^(advisor|client|admin):([1-9][0-9]{0,8})$")
 
 
 def get_conn() -> Iterator[psycopg.Connection]:
@@ -53,14 +53,23 @@ def get_llm_client() -> Any:
     return _anthropic_client()
 
 
+TABLE_FOR = {"advisor": "advisors", "client": "clients", "admin": "admins"}
+
+
 @dataclass(frozen=True)
 class CurrentUser:
-    viewer: Viewer
+    kind: str  # advisor | client | admin
+    id: int
     name: str
 
     @property
+    def viewer(self) -> Viewer:
+        """For data queries. Only advisors and clients see account data (Viewer rejects anything else)."""
+        return Viewer(self.kind, self.id)
+
+    @property
     def portal(self) -> str:
-        return f"/{self.viewer.kind}"
+        return f"/{self.kind}"
 
 
 def demo_auth_allowed() -> bool:
@@ -100,9 +109,7 @@ def _cognito_user(authorization: str | None, conn: psycopg.Connection, key_resol
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your sign-in has expired or isn't valid.") from exc
     except NotSetUp as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
-    if ident.kind == "admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "The admin portal isn't available yet.")
-    table = "advisors" if ident.kind == "advisor" else "clients"  # fixed by verify_access_token
+    table = TABLE_FOR[ident.kind]  # fixed by verify_access_token
     row = conn.execute(
         f"SELECT id, first_name || ' ' || last_name AS name FROM {table} WHERE username = %s",
         (ident.username,),
@@ -114,7 +121,7 @@ def _cognito_user(authorization: str | None, conn: psycopg.Connection, key_resol
             f"The login '{ident.username}' is in the {ident.kind}s group, but there is no {ident.kind} with the "
             f"username '{ident.username}' in AdvisorAgent.",
         )
-    return CurrentUser(Viewer(ident.kind, row["id"]), row["name"])
+    return CurrentUser(ident.kind, row["id"], row["name"])
 
 
 def _demo_user(x_demo_user: str | None, conn: psycopg.Connection) -> CurrentUser:
@@ -125,22 +132,28 @@ def _demo_user(x_demo_user: str | None, conn: psycopg.Connection) -> CurrentUser
     if match is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Choose a demo user first.")
     kind, person_id = match.group(1), int(match.group(2))
-    table = "advisors" if kind == "advisor" else "clients"  # fixed by the regex above
+    table = TABLE_FOR[kind]  # fixed by the regex above
     row = conn.execute(
         f"SELECT first_name || ' ' || last_name AS name FROM {table} WHERE id = %s", (person_id,)
     ).fetchone()
     if row is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Unknown user.")
-    return CurrentUser(Viewer(kind, person_id), row["name"])
+    return CurrentUser(kind, person_id, row["name"])
 
 
 def require_advisor(user: CurrentUser = Depends(current_user)) -> CurrentUser:
-    if user.viewer.kind != "advisor":
+    if user.kind != "advisor":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This portal is for advisors.")
     return user
 
 
 def require_client(user: CurrentUser = Depends(current_user)) -> CurrentUser:
-    if user.viewer.kind != "client":
+    if user.kind != "client":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This portal is for clients.")
+    return user
+
+
+def require_admin(user: CurrentUser = Depends(current_user)) -> CurrentUser:
+    if user.kind != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This portal is for administrators.")
     return user

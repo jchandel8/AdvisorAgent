@@ -18,6 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 DEMO_USERS_CSV = REPO_ROOT / "demo_users.csv"
 
 TABLES = [
+    "permission_audit",
     "assistant_events",
     "agent_conversations",
     "demo_users",
@@ -31,6 +32,7 @@ TABLES = [
     "accounts",
     "clients",
     "advisors",
+    "admins",
 ]
 
 
@@ -65,7 +67,12 @@ def load(conn: psycopg.Connection, ds: Dataset) -> None:
             " %(open_date)s, %(close_date)s)",
             ds.accounts,
         )
-        for table in ("advisors", "clients", "accounts"):
+        cur.executemany(
+            "INSERT INTO admins (id, username, first_name, last_name, email) OVERRIDING SYSTEM VALUE"
+            " VALUES (%(id)s, %(username)s, %(first_name)s, %(last_name)s, %(email)s)",
+            ds.admins,
+        )
+        for table in ("advisors", "clients", "accounts", "admins"):
             cur.execute(
                 f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), (SELECT max(id) FROM {table}))"
             )
@@ -115,17 +122,31 @@ def load(conn: psycopg.Connection, ds: Dataset) -> None:
             ],
             ds.performance,
         )
-        demo_rows = [
-            (
-                "advisor",
-                aid,
-                None,
-                "Several clients are heavy in technology stocks with reviews due this month.",
-                i,
-            )
-            for i, aid in enumerate(ds.demo["advisor_ids"])
-        ] + [("client", None, cid, note, 10 + i) for i, (cid, note) in enumerate(ds.demo["clients"].items())]
-        _copy(cur, "demo_users", ["person_type", "advisor_id", "client_id", "note", "sort_order"], demo_rows)
+        tech_note = "Several clients are heavy in technology stocks with reviews due this month."
+        demo_rows = (
+            [("advisor", aid, None, None, tech_note, i) for i, aid in enumerate(ds.demo["advisor_ids"])]
+            + [
+                ("client", None, cid, None, note, 10 + i)
+                for i, (cid, note) in enumerate(ds.demo["clients"].items())
+            ]
+            + [
+                (
+                    "admin",
+                    None,
+                    None,
+                    a["id"],
+                    "Creates users and accounts, and grants or revokes access.",
+                    20 + i,
+                )
+                for i, a in enumerate(ds.admins)
+            ]
+        )
+        _copy(
+            cur,
+            "demo_users",
+            ["person_type", "advisor_id", "client_id", "admin_id", "note", "sort_order"],
+            demo_rows,
+        )
         _copy(
             cur,
             "documents",
@@ -180,6 +201,17 @@ def write_demo_users(conn: psycopg.Connection, ds: Dataset, path: Path = DEMO_US
             "demo_note": client_notes.get(r[0], ""),
         }
         for r in clients
+    ]
+    rows += [
+        {
+            "name": f"{a['first_name']} {a['last_name']}",
+            "email": a["email"],
+            "role": "admin",
+            "person_id": a["id"],
+            "client_count": "",
+            "demo_note": "DEMO admin: creates users and accounts, grants and revokes access",
+        }
+        for a in ds.admins
     ]
     rows.sort(key=lambda r: (r["demo_note"] == "", r["role"], r["person_id"]))
 

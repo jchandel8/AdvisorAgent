@@ -181,9 +181,11 @@ def client_profile(conn: psycopg.Connection, client_id: int) -> dict:
 def demo_users(conn: psycopg.Connection, today: date) -> list[dict]:
     """Suggested demo users with what each can see (computed through the same access rules)."""
     return conn.execute(
-        """SELECT d.person_type AS kind, coalesce(d.advisor_id, d.client_id) AS id, d.note,
-                  coalesce(a.first_name || ' ' || a.last_name, c.first_name || ' ' || c.last_name) AS name,
-                  coalesce(a.email, c.email) AS email,
+        """SELECT d.person_type AS kind, coalesce(d.advisor_id, d.client_id, d.admin_id) AS id, d.note,
+                  coalesce(a.first_name || ' ' || a.last_name, c.first_name || ' ' || c.last_name,
+                           m.first_name || ' ' || m.last_name) AS name,
+                  coalesce(a.username, c.username, m.username) AS username,
+                  coalesce(a.email, c.email, m.email) AS email,
                   (SELECT count(*) FROM account_access x
                     WHERE (d.person_type = 'advisor' AND x.advisor_id = d.advisor_id)
                        OR (d.person_type = 'client' AND x.client_id = d.client_id)) AS account_count,
@@ -195,5 +197,6 @@ def demo_users(conn: psycopg.Connection, today: date) -> list[dict]:
            FROM demo_users d
            LEFT JOIN advisors a ON a.id = d.advisor_id
            LEFT JOIN clients c ON c.id = d.client_id
+           LEFT JOIN admins m ON m.id = d.admin_id
            ORDER BY d.sort_order"""
     ).fetchall()

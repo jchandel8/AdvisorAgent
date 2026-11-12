@@ -55,7 +55,7 @@ export class Session {
       if (!raw) return null;
       const u = JSON.parse(raw) as Partial<SessionUser>;
       if (
-        (u.kind === 'advisor' || u.kind === 'client') &&
+        (u.kind === 'advisor' || u.kind === 'client' || u.kind === 'admin') &&
         Number.isInteger(u.id) &&
         typeof u.name === 'string'
       ) {

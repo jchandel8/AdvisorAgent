@@ -30,9 +30,11 @@ test('client signs in with Cognito and sees only their portal', async ({ page })
   await expect(page).toHaveURL(/\/client\//);
 });
 
-test('the demo picker does not exist in cognito mode', async ({ page }) => {
+test('the demo page lists who to sign in as, without a picker', async ({ page }) => {
   await page.goto('/demo');
-  await expect(page).toHaveURL(/\/login/);
-  const res = await page.request.get('/api/demo/users');
-  expect(res.status()).toBe(404);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Demo users');
+  await expect(page.getByText('anthony.gonzalez')).toBeVisible();
+  // The demo header doesn't sign anyone in when Cognito is on.
+  const res = await page.request.get('/api/me', { headers: { 'X-Demo-User': 'advisor:2' } });
+  expect(res.status()).toBe(401);
 });

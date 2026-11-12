@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from wealth.api import routes_advisor, routes_client, routes_common
+from wealth.api import routes_admin, routes_advisor, routes_client, routes_common
 from wealth.config import get_settings, running_on_aws
 from wealth.db import close_pools
 
@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_common.router)
     app.include_router(routes_client.router)
     app.include_router(routes_advisor.router)
+    app.include_router(routes_admin.router)
     return app
 
 

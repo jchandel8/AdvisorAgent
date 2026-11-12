@@ -13,7 +13,7 @@ describe('Session', () => {
   it('ignores tampered or malformed stored users', () => {
     localStorage.setItem(
       'advisoragent.demoUser',
-      JSON.stringify({ kind: 'admin', id: 1, name: 'x' }),
+      JSON.stringify({ kind: 'superuser', id: 1, name: 'x' }),
     );
     expect(TestBed.inject(Session).user()).toBeNull();
   });

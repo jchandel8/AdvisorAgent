@@ -60,3 +60,39 @@ test('advisor and client see the same shared account with the same value', async
   await expect(row(client)).toBeVisible();
   expect(await value(advisor)).toBe(await value(client));
 });
+
+test('admin grants an account, the advisor sees it, then the admin revokes it (demo script)', async ({ browser }) => {
+  // Account 19 is Kevin Keith's "Individual 2", handled by a different advisor than Anthony.
+  const admin = await (await browser.newContext()).newPage();
+  const advisor = await (await browser.newContext()).newPage();
+  await pick(admin, 'Morgan Lee');
+  await expect(admin).toHaveURL(/\/admin\/users/);
+  await pick(advisor, 'Anthony Gonzalez');
+
+  await advisor.goto('/advisor/accounts?client=10');
+  await expect(advisor.getByText('You manage 2 accounts for Kevin Keith')).toBeVisible();
+
+  // Grant
+  await admin.goto('/admin/permissions?account=19');
+  await admin.getByLabel('Grant access to').fill('anthony');
+  await admin.getByRole('button', { name: /Anthony Gonzalez/ }).click();
+  await admin.getByRole('button', { name: 'Grant access' }).click();
+  await expect(admin.getByRole('status')).toContainText('Granted Anthony Gonzalez');
+
+  await advisor.reload();
+  await expect(advisor.getByText('You manage 3 accounts for Kevin Keith')).toBeVisible();
+
+  // Revoke (restores the starting state)
+  const row = admin.getByRole('row', { name: /Anthony Gonzalez/ });
+  await row.getByRole('button', { name: 'Revoke' }).click();
+  await row.getByRole('button', { name: 'Confirm revoke' }).click();
+  await expect(admin.getByRole('status')).toContainText("Revoked Anthony Gonzalez's access");
+
+  await advisor.reload();
+  await expect(advisor.getByText('You manage 2 accounts for Kevin Keith')).toBeVisible();
+
+  // Both changes are in the audit log.
+  await admin.goto('/admin/audit');
+  await expect(admin.getByRole('row', { name: /Revoked Anthony Gonzalez/ })).toBeVisible();
+  await expect(admin.getByRole('row', { name: /Granted Anthony Gonzalez/ })).toBeVisible();
+});

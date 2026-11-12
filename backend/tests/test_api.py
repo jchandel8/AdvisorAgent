@@ -80,7 +80,7 @@ def test_portals_are_role_checked(api):
 def test_demo_login_refused_on_aws(api, monkeypatch):
     monkeypatch.setenv("ECS_CONTAINER_METADATA_URI_V4", "http://169.254.170.2/v4/x")
     assert api.get("/api/me", headers=as_user("client", C1)).status_code == 401
-    assert api.get("/api/demo/users").status_code == 404
+    assert api.get("/api/demo/users").status_code == 200  # public list; signing in is what's refused
 
 
 def test_app_will_not_start_on_aws_with_demo_login(monkeypatch):

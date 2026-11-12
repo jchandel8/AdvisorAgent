@@ -1,6 +1,6 @@
 // Shapes returned by the FastAPI backend (backend/src/wealth/api). Money is in US dollars.
 
-export type PersonKind = 'advisor' | 'client';
+export type PersonKind = 'advisor' | 'client' | 'admin';
 
 export interface Me {
   kind: PersonKind;
@@ -15,6 +15,7 @@ export interface DemoUser {
   name: string;
   email: string;
   note: string;
+  username: string;
   account_count: number;
   client_count: number | null;
 }
@@ -188,4 +189,98 @@ export interface AssistantReply {
   /** A guardrail stopped the question (off-topic, manipulation) or an unsupported answer. */
   blocked: boolean;
   tool_calls: ToolCall[];
+}
+
+// ---- Admin portal --------------------------------------------------------------------------------------
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  risk_profile?: string;
+  account_count?: number;
+  client_count?: number;
+}
+
+export interface NewUser {
+  kind: 'advisor' | 'client';
+  first_name: string;
+  last_name: string;
+  email: string;
+  username?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  state?: string | null;
+  risk_profile?: string;
+}
+
+export interface AdminAccount {
+  account_id: number;
+  account_name: string;
+  account_type: string;
+  open_date: string;
+  close_date: string | null;
+  clients: string | null;
+  advisors: string | null;
+}
+
+export interface NewAccount {
+  account_name: string;
+  account_type: 'individual' | 'joint' | 'ira' | 'trust';
+  description?: string | null;
+  owner_client_ids: number[];
+  advisor_ids: number[];
+}
+
+export interface AccessRow {
+  access_id: number;
+  person_type: 'advisor' | 'client';
+  person_id: number;
+  name: string;
+  username: string;
+  role: string;
+  granted_at: string;
+  granted_by: string | null;
+}
+
+export interface AccountAccess {
+  account_id: number;
+  account_name: string;
+  account_type: string;
+  open_date: string;
+  close_date: string | null;
+  access: AccessRow[];
+}
+
+export interface Person {
+  person_type: 'advisor' | 'client';
+  person_id: number;
+  name: string;
+  username: string;
+}
+
+export interface AuditEvent {
+  id: number;
+  created_at: string;
+  admin_name: string;
+  action: string;
+  summary: string;
+}
+
+export interface AssistantEvent {
+  id: number;
+  created_at: string;
+  advisor_name: string;
+  outcome: string;
+  question: string;
+  reason: string | null;
+}
+
+export interface Paged<T> {
+  page: number;
+  page_size: number;
+  total_rows: number;
+  events: T[];
 }
