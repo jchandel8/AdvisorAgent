@@ -9,13 +9,12 @@ See [CLAUDE.md](CLAUDE.md) for the design and [docs/PROGRESS.md](docs/PROGRESS.m
 ## Quick start (local)
 
 ```bash
-cp .env.example .env            # then fill in DATABASE_URL and ANTHROPIC_API_KEY
-docker compose up -d db
-cd backend
-uv sync
-uv run python -m wealth.datagen # create schema, load seeded mock data, write ../demo_users.csv
-uv run pytest -q
-uv run wealth-agent --advisor-id 1
+cp .env.example .env            # then fill in ANTHROPIC_API_KEY
+docker compose up               # Postgres, API (seeds mock data on first run) and the web app
 ```
 
-Try: *"Which of my clients are overweight in tech and have a review due this month?"*
+Open http://localhost:4200, pick a demo advisor in a normal window and a demo client in a private window,
+and compare what each can see. In the advisor portal, open **Assistant** and try:
+*"Which of my clients are overweight in tech and have a review due this month?"*
+
+Backend tests: `cd backend && uv run pytest -q`. Frontend tests: `docker compose exec web npx ng test --watch=false`.

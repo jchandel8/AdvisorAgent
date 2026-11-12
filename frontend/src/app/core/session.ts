@@ -51,7 +51,11 @@ export class Session {
       const raw = localStorage.getItem(KEY);
       if (!raw) return null;
       const u = JSON.parse(raw) as Partial<SessionUser>;
-      if ((u.kind === 'advisor' || u.kind === 'client') && Number.isInteger(u.id) && typeof u.name === 'string') {
+      if (
+        (u.kind === 'advisor' || u.kind === 'client') &&
+        Number.isInteger(u.id) &&
+        typeof u.name === 'string'
+      ) {
         return { kind: u.kind, id: u.id as number, name: u.name };
       }
     } catch {
@@ -66,7 +70,10 @@ export const sessionInterceptor: HttpInterceptorFn = (req, next) => {
   const session = inject(Session);
   const router = inject(Router);
   const header = session.header();
-  const withUser = header && req.url.startsWith('/api/') ? req.clone({ setHeaders: { 'X-Demo-User': header } }) : req;
+  const withUser =
+    header && req.url.startsWith('/api/')
+      ? req.clone({ setHeaders: { 'X-Demo-User': header } })
+      : req;
   return next(withUser).pipe(
     catchError((err: unknown) => {
       if (err instanceof HttpErrorResponse && err.status === 401 && req.url !== '/api/demo/users') {

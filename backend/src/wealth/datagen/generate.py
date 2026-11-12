@@ -179,6 +179,8 @@ def _make_accounts(rng, households, clients_by_id, history_start, anchor):
     accounts: list[dict] = []
     access: list[dict] = []
 
+    names_by_owner: dict[int, set[str]] = {}
+
     def add_account(hh: Household, kind: str, owners: list[int]) -> int:
         aid = len(accounts) + 1
         c0 = clients_by_id[owners[0]]
@@ -194,6 +196,13 @@ def _make_accounts(rng, households, clients_by_id, history_start, anchor):
                 f"{c0['first_name']} {c0['last_name']} Individual",
                 "Individual taxable brokerage account",
             )
+        # A client with two accounts of the same kind gets "... 2" so names stay distinguishable.
+        seen = names_by_owner.setdefault(owners[0], set())
+        base, n = name, 1
+        while name in seen:
+            n += 1
+            name = f"{base} {n}"
+        seen.add(name)
         accounts.append(
             {
                 "id": aid,

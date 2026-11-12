@@ -1,7 +1,11 @@
 // Formatting helpers. Money is USD (the only currency in the data).
 
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-const usd0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const usd0 = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+});
 const usdCompact = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
@@ -9,9 +13,23 @@ const usdCompact = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 1,
 });
 const qty = new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 });
-const longDate = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-const shortDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-const monthYear = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+const longDate = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+const shortDate = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+const monthYear = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
 
 export const money = (v: number | null | undefined): string => (v == null ? '—' : usd.format(v));
 export const money0 = (v: number | null | undefined): string => (v == null ? '—' : usd0.format(v));
@@ -21,8 +39,10 @@ export const percent = (v: number | null | undefined, digits = 1): string =>
   v == null ? '—' : `${v.toFixed(digits)}%`;
 
 /** Dates arrive as YYYY-MM-DD; format in UTC so the day never shifts with the viewer's time zone. */
-export const dateLong = (iso: string | null | undefined): string => (iso ? longDate.format(new Date(iso)) : '—');
-export const dateShort = (iso: string | null | undefined): string => (iso ? shortDate.format(new Date(iso)) : '—');
+export const dateLong = (iso: string | null | undefined): string =>
+  iso ? longDate.format(new Date(iso)) : '—';
+export const dateShort = (iso: string | null | undefined): string =>
+  iso ? shortDate.format(new Date(iso)) : '—';
 export const dateMonth = (iso: string): string => monthYear.format(new Date(iso));
 
 export const accountTypeLabel: Record<string, string> = {

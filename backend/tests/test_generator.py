@@ -216,3 +216,13 @@ def test_typical_client_is_not_tech_heavy(ds):
     flagged = set(ds.demo["tech_overweight_client_ids"])
     weights = sorted(_tech_weight(ds, c["id"]) for c in ds.clients if c["id"] not in flagged)
     assert weights[len(weights) // 2] < 0.30  # median
+
+
+def test_account_names_are_unique_per_owner(ds):
+    names = defaultdict(list)
+    for r in ds.access:
+        if r["role"] == "owner":
+            acct = next(a for a in ds.accounts if a["id"] == r["account_id"])
+            names[r["client_id"]].append(acct["account_name"])
+    for client_id, owned in names.items():
+        assert len(owned) == len(set(owned)), (client_id, owned)
