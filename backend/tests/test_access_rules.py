@@ -312,3 +312,50 @@ def test_performance_flags_periods_missing_for_some_accounts(conn):
     a2 = run(conn, A2, "get_performance", client_id=C3)  # J has no 5Y figure, Z does
     assert "5y" in a2["partial_periods"] and "1m" not in a2["partial_periods"]
     assert run(conn, A1, "get_performance", account_id=X)["partial_periods"] == []
+
+
+# --- Assistant focus: a selected client is a hard scope ---------------------------------------------------
+
+
+def focused(conn, advisor_id, focus, name, **kwargs):
+    return execute_tool(name, kwargs, advisor_id=advisor_id, today=TODAY, conn=conn, focus_client_id=focus)
+
+
+def test_focus_client_list_is_only_the_selected_client(conn):
+    # A2 shares joint account J with C2 and C3; with C3 selected, co-owner C2 must not appear.
+    clients = focused(conn, A2, C3, "get_my_clients")["clients"]
+    assert [c["client_id"] for c in clients] == [C3]
+    assert clients[0]["accessible_market_value"] == 24000  # J + Z, both C3's
+
+
+def test_focus_reviews_only_the_selected_client(conn):
+    due = focused(conn, A2, C1, "find_reviews_due", within_days=365)["clients"]
+    assert [c["client_id"] for c in due] == [C1]
+
+
+@pytest.mark.parametrize("tool_name", ["get_accounts", "get_holdings", "get_performance"])
+def test_focus_refuses_other_clients_by_id(conn, tool_name):
+    result = focused(conn, A2, C3, tool_name, client_id=C2)  # C2 is A2's client, but not the selected one
+    assert result["error"] == "outside selected client"
+
+
+@pytest.mark.parametrize(
+    "tool_name,extra",
+    [("get_holdings", {}), ("get_performance", {}), ("get_transactions", {"start_date": "2000-01-01"})],
+)
+def test_focus_hides_other_clients_accounts(conn, tool_name, extra):
+    # Y is C1's account, which A2 can normally see; with C3 selected it is out of reach.
+    assert focused(conn, A2, C3, tool_name, account_id=Y, **extra) == NOT_FOUND
+    # A1 with C1 selected cannot reach joint account J (C2 and C3's).
+    assert focused(conn, A1, C1, tool_name, account_id=J, **extra) == NOT_FOUND
+
+
+def test_focus_still_answers_about_the_selected_client(conn):
+    h = focused(conn, A2, C3, "get_holdings", client_id=C3)
+    assert [a["account_id"] for a in h["accounts"]] == [J, Z]
+    assert focused(conn, A2, C3, "get_holdings", account_id=Z)["portfolio_market_value"] == 20000
+
+
+def test_no_focus_is_unchanged(conn):
+    clients = focused(conn, A2, None, "get_my_clients")["clients"]
+    assert {c["client_id"] for c in clients} == {C1, C2, C3, C4}

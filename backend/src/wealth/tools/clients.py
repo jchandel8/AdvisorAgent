@@ -25,6 +25,7 @@ SELECT c.id AS client_id,
        round(coalesce(sum(m.market_value), 0), 2) AS accessible_market_value
 FROM client_accounts x
 JOIN clients c ON c.id = x.client_id
+    AND (%(focus_client_id)s::int IS NULL OR c.id = %(focus_client_id)s::int)  -- not joint co-owners
 LEFT JOIN account_mv m ON m.account_id = x.account_id
 """
 
