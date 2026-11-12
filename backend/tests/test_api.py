@@ -95,8 +95,8 @@ def test_app_will_not_start_on_aws_with_demo_login(monkeypatch):
         get_settings.cache_clear()
 
 
-def test_demo_login_off_by_default(api, monkeypatch):
-    monkeypatch.setenv("DEMO_AUTH_ENABLED", "false")
+def test_demo_login_off_outside_demo_mode(api, monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "cognito")
     get_settings.cache_clear()
     assert api.get("/api/me", headers=as_user("client", C1)).status_code == 401
 

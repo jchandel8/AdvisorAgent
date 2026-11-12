@@ -50,3 +50,15 @@ def conn(test_db_url: str) -> Iterator[psycopg.Connection]:
             yield c
         finally:
             c.rollback()
+
+
+@pytest.fixture(autouse=True)
+def isolated_auth_settings(monkeypatch):
+    """Tests never depend on the developer's .env sign-in settings: demo mode, no Cognito, unless a test
+    sets its own. Values are set to empty (not removed) so .env can't refill them."""
+    monkeypatch.setenv("AUTH_MODE", "demo")
+    for name in ("COGNITO_REGION", "COGNITO_USER_POOL_ID", "COGNITO_CLIENT_ID", "COGNITO_DOMAIN"):
+        monkeypatch.setenv(name, "")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()

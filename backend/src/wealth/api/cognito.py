@@ -28,6 +28,10 @@ class TokenError(Exception):
     """The token is missing, malformed, expired, or not for this app. Always answered with 401."""
 
 
+class NotSetUp(Exception):
+    """A valid sign-in whose login isn't set up for this app (no group). Answered with 403 and the reason."""
+
+
 @dataclass(frozen=True)
 class TokenIdentity:
     kind: str  # advisor | client | admin
@@ -67,10 +71,13 @@ def verify_access_token(
         raise TokenError("not an access token")
     if claims.get("client_id") != client_id:
         raise TokenError("token is for another app")
-    groups = [g for g in claims.get("cognito:groups", []) if g in GROUPS]
-    if len(groups) != 1:
-        raise TokenError("user must be in exactly one of advisors, clients, admins")
     username = claims.get("username") or claims.get("cognito:username")
     if not isinstance(username, str) or not username:
         raise TokenError("token has no username")
+    groups = [g for g in claims.get("cognito:groups", []) if g in GROUPS]
+    if len(groups) != 1:
+        raise NotSetUp(
+            f"The login '{username}' must be in exactly one Cognito group: advisors, clients or admins "
+            f"(it is in {len(groups)})."
+        )
     return TokenIdentity(kind=GROUPS[groups[0]], username=username, sub=str(claims["sub"]))
