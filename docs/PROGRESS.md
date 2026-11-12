@@ -151,6 +151,10 @@ Layers, in order (code: `agent/guard.py`, `agent/loop.py`, `api/usage.py`, migra
 4. **Answer check**: money/percent figures with no tool call anywhere in the conversation -> fixed reply,
    and the turn is removed from the history.
 5. **Audit**: every request in `assistant_events` (outcome + short reason); admin portal (step 4) can show it.
+6. **Selected client = hard scope** (owner's decision, after a "Moon" question with Renee Wilson selected
+   listed Moody/Moore clients): `focus_client_id` narrows the VISIBLE CTE to that client's accounts, client
+   lists return only that client (not joint co-owners), and a tool call naming another client_id returns
+   "outside selected client". Enforced in the tool layer, not the prompt.
 Eval: `uv run python evals/run_scope_guard.py` (42 labelled cases, ~$0.01). Latest: 20/20 in-scope allowed,
 21/22 blocked + 1 blocked by fail-closed. Known miss: "Danielle Johnson's clients" (another advisor's name)
 is classed in-scope, but no data can leak: the tools only return the signed-in advisor's accounts. The ACL,

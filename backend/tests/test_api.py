@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from contextlib import contextmanager
 
 import pytest
@@ -324,3 +325,15 @@ def test_rate_limited_attempts_do_not_count(api, fake_llm, conn, monkeypatch):
     )
     fake_llm.responses += [reply("end_turn", text("ok"))]
     assert ask(api, A1, message="real question").status_code == 200
+
+
+def test_assistant_focus_scopes_every_tool_call(api, fake_llm):
+    # With C1 selected, the model asks for the whole client list: it must only get C1 back.
+    fake_llm.responses += [
+        reply("tool_use", tool_use("get_my_clients", {})),
+        reply("end_turn", text("Only C1.")),
+    ]
+    r = ask(api, A1, message="list my clients", client_id=C1).json()
+    sent = json.loads(fake_llm.requests[-1]["messages"][-1]["content"][0]["content"])
+    assert [c["client_id"] for c in sent["clients"]] == [C1]
+    assert r["answer"] == "Only C1."

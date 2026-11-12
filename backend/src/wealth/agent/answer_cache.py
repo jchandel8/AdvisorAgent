@@ -22,7 +22,7 @@ from datetime import UTC, date, datetime, time, timedelta
 
 import psycopg
 
-from wealth.access import VISIBLE
+from wealth.access import VISIBLE, Viewer
 
 KEY_VERSION = 1
 
@@ -62,7 +62,7 @@ class AnswerCache:
         row = conn.execute(
             f"WITH {VISIBLE} SELECT coalesce(string_agg(account_id::text, ',' ORDER BY account_id), '') AS ids"
             " FROM visible",
-            {"viewer_kind": "advisor", "viewer_id": advisor_id},
+            Viewer("advisor", advisor_id).params(),
         ).fetchone()
         access = row["ids"] if isinstance(row, dict) else row[0]
         payload = json.dumps(

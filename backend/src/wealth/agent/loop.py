@@ -149,8 +149,9 @@ class AdvisorAgent:
             if name is None:
                 return TurnResult("I can't find that client among the clients you can access.", "not_found")
             question = (
-                f"[Selected client: {name} (client ID {focus_client_id}). Answer about this client unless the "
-                f"question says otherwise.]\n\n{question}"
+                f"[Selected client: {name} (client ID {focus_client_id}). Only this client's data is available. "
+                f"If the question is about anyone else, say that {name} is selected and the advisor can choose "
+                f"'All your clients' to ask about others.]\n\n{question}"
             )
         key = None
         if self.cache is not None:
@@ -266,7 +267,12 @@ class AdvisorAgent:
                 if block.type != "tool_use":
                     continue
                 output = execute_tool(
-                    block.name, block.input, advisor_id=self.advisor_id, today=self.today, conn=self.conn
+                    block.name,
+                    block.input,
+                    advisor_id=self.advisor_id,
+                    today=self.today,
+                    conn=self.conn,
+                    focus_client_id=focus_client_id,
                 )
                 is_error = "error" in output
                 calls.append(ToolCall(block.name, dict(block.input or {}), is_error))

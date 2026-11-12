@@ -131,6 +131,7 @@ def execute_tool(
     advisor_id: int,
     today: date,
     conn: psycopg.Connection | None = None,
+    focus_client_id: int | None = None,
 ) -> dict:
     """Validate and run one tool for the session's advisor. Always returns a JSON-safe dict."""
     tool = TOOLS.get(name)
@@ -142,16 +143,25 @@ def execute_tool(
         details = [f"{'.'.join(map(str, e['loc'])) or 'input'}: {e['msg']}" for e in exc.errors()]
         return {"error": "invalid input", "details": details}
 
+    # Hard scope: with a client selected, a lookup that names any other client is refused outright.
+    asked_client = getattr(params, "client_id", None)
+    if focus_client_id is not None and asked_client is not None and asked_client != focus_client_id:
+        return {
+            "error": "outside selected client",
+            "detail": f"The advisor has selected client {focus_client_id}; only that client's data is available. "
+            "Tell the advisor to choose 'All your clients' to ask about anyone else.",
+        }
+
+    def ctx(c: psycopg.Connection) -> ToolContext:
+        viewer = Viewer("advisor", advisor_id)
+        return ToolContext(conn=c, viewer=viewer, today=today, focus_client_id=focus_client_id)
+
     try:
         if conn is not None:
-            result = tool.fn(
-                ToolContext(conn=conn, viewer=Viewer("advisor", advisor_id), today=today), params
-            )
+            result = tool.fn(ctx(conn), params)
         else:
             with read_only() as c:
-                result = tool.fn(
-                    ToolContext(conn=c, viewer=Viewer("advisor", advisor_id), today=today), params
-                )
+                result = tool.fn(ctx(c), params)
     except Exception:
         log.exception("tool %s failed", name)
         return {"error": "tool failed"}

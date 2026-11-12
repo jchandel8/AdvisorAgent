@@ -16,7 +16,9 @@ from typing import Literal
 
 import psycopg
 
-# Requires the query parameters %(viewer_kind)s ('advisor' or 'client') and %(viewer_id)s.
+# Requires the query parameters %(viewer_kind)s ('advisor' or 'client'), %(viewer_id)s and
+# %(focus_client_id)s. When the advisor has selected a client in the Assistant, focus_client_id narrows the
+# visible accounts to that client's accounts, so every query is scoped to them (hard scope, not a prompt hint).
 VISIBLE = """
 visible AS (
     SELECT aa.account_id
@@ -26,6 +28,13 @@ visible AS (
       AND (
           (%(viewer_kind)s = 'advisor' AND aa.advisor_id = %(viewer_id)s)
           OR (%(viewer_kind)s = 'client' AND aa.client_id = %(viewer_id)s)
+      )
+      AND (
+          %(focus_client_id)s::int IS NULL
+          OR EXISTS (
+              SELECT 1 FROM account_access f
+              WHERE f.account_id = aa.account_id AND f.client_id = %(focus_client_id)s::int
+          )
       )
 )"""
 
@@ -84,7 +93,7 @@ class Viewer:
             raise ValueError(f"invalid viewer {self.kind!r} {self.id!r}")
 
     def params(self) -> dict:
-        return {"viewer_kind": self.kind, "viewer_id": self.id}
+        return {"viewer_kind": self.kind, "viewer_id": self.id, "focus_client_id": None}
 
 
 @dataclass(frozen=True)
@@ -94,9 +103,10 @@ class ToolContext:
     conn: psycopg.Connection
     viewer: Viewer
     today: date
+    focus_client_id: int | None = None  # Assistant: the selected client; all queries are limited to them
 
     def viewer_params(self) -> dict:
-        return self.viewer.params()
+        return {**self.viewer.params(), "focus_client_id": self.focus_client_id}
 
 
 def scoped_account_ids(ctx: ToolContext, *, account_id: int | None, client_id: int | None) -> list[int]:
