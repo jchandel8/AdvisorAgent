@@ -1,0 +1,586 @@
+<title>AdvisorAgent Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&display=swap">
+<style>
+  /* Layout: one wide request-flow diagram with playable journeys, then reference sections for the AI agent.
+     Tokens follow the project's design system (design-system/advisoragent/MASTER.md). */
+  :root {
+    --paper: #f6f7f5;
+    --surface: #ffffff;
+    --sunk: #eef1ef;
+    --ink: #17201d;
+    --muted: #55625d;
+    --rule: #dce1de;
+    --line: #9aa6a1;
+    --advisor: #0e5a4a;
+    --client: #2e3a8c;
+    --ai: #8a5a00;
+    --ai-soft: #fbf3e2;
+    --ai-line: #c58b1e;
+    --blocked: #a3261b;
+    --focus: #1d5fd1;
+    --font: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #111816; --surface: #18211e; --sunk: #141c19; --ink: #e6ece9; --muted: #a3b0ab;
+      --rule: #2c3833; --line: #5b6a64; --advisor: #5fbfa6; --client: #9faaf5; --ai: #e8b45a;
+      --ai-soft: #2a2416; --ai-line: #c58b1e; --blocked: #f08a7e; --focus: #7aa7ff; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #111816; --surface: #18211e; --sunk: #141c19; --ink: #e6ece9; --muted: #a3b0ab;
+    --rule: #2c3833; --line: #5b6a64; --advisor: #5fbfa6; --client: #9faaf5; --ai: #e8b45a;
+    --ai-soft: #2a2416; --ai-line: #c58b1e; --blocked: #f08a7e; --focus: #7aa7ff; color-scheme: dark;
+  }
+
+  body { background: var(--paper); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.55; }
+  .wrap {
+    max-width: 1240px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 40px 64px;
+    display: grid; gap: 48px;
+  }
+  h1, h2, h3 { line-height: 1.2; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(1.75rem, 3.5vw, 2.5rem); font-weight: 600; }
+  h2 { font-size: 1.375rem; font-weight: 600; }
+  h3 { font-size: 1.0625rem; font-weight: 600; }
+  p { margin: 0; }
+  .lede { max-width: 68ch; color: var(--muted); margin-top: 12px; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  /* Diagram ------------------------------------------------------------------------------------------- */
+  .stage { display: grid; gap: 16px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tab, .btn {
+    font: inherit; font-size: 0.9375rem; min-height: 44px; padding: 0 16px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px; transition: background-color .15s, border-color .15s;
+  }
+  .tab:hover, .btn:hover { background: var(--sunk); }
+  .tab[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); font-weight: 600; }
+  .tab .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .btns { display: flex; gap: 8px; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .canvas { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; overflow-x: auto; }
+  .canvas svg { display: block; width: 100%; min-width: 860px; height: auto; }
+
+  svg text { font-family: var(--font); fill: var(--ink); }
+  svg .t { font-size: 14px; font-weight: 600; }
+  svg .s { font-size: 11.5px; fill: var(--muted); }
+  svg .lbl { font-size: 11px; fill: var(--muted); }
+  svg .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; }
+  svg .zone-api { fill: var(--sunk); stroke: var(--line); stroke-width: 1.25; stroke-dasharray: 6 5; }
+  svg .zone-ai { fill: var(--ai-soft); stroke: var(--ai-line); stroke-width: 1.5; }
+  svg .ai-title { fill: var(--ai); font-size: 15px; font-weight: 700; }
+  svg .box-ai { fill: var(--surface); stroke: var(--ai-line); stroke-width: 1.25; }
+  svg .box-adv { stroke: var(--advisor); stroke-width: 1.75; }
+  svg .box-cli { stroke: var(--client); stroke-width: 1.75; }
+  svg .band-adv { fill: var(--advisor); }
+  svg .band-cli { fill: var(--client); }
+  svg .edge { fill: none; stroke: var(--line); stroke-width: 1.5; }
+  svg .edge.dash { stroke-dasharray: 4 4; }
+  svg .arrowhead { fill: var(--line); }
+  svg .node { transition: opacity .25s; }
+  svg .node.on .box, svg .node.on .box-ai { stroke: var(--packet, var(--ink)); stroke-width: 2.5; }
+  svg .edge.on { stroke: var(--packet, var(--ink)); stroke-width: 2.5; }
+  svg .packet { fill: var(--packet, var(--ink)); }
+  svg .halo { fill: var(--packet, var(--ink)); opacity: .22; }
+
+  .now {
+    display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 20px;
+  }
+  .now .num {
+    font-variant-numeric: tabular-nums; font-weight: 700; min-width: 2ch; color: var(--packet, var(--ink));
+  }
+  .steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; counter-reset: s; }
+  .steps li {
+    counter-increment: s; display: grid; grid-template-columns: 2.25rem 1fr; gap: 8px; padding: 8px 12px;
+    border-radius: 8px; color: var(--muted); cursor: pointer;
+  }
+  .steps li::before { content: counter(s); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .steps li:hover { background: var(--sunk); }
+  .steps li.on { background: var(--sunk); color: var(--ink); }
+  .steps li.on::before { color: var(--packet, var(--ink)); }
+  .steps li.done { color: var(--ink); }
+  .steps code, .card code, td code { font-size: 0.875em; background: var(--sunk); padding: 0.05em 0.35em; border-radius: 4px; }
+
+  /* Reference sections ---------------------------------------------------------------------------------- */
+  .agent {
+    border: 1.5px solid var(--ai-line); background: var(--ai-soft); border-radius: 12px; padding: 24px;
+    display: grid; gap: 24px;
+  }
+  .agent-head { display: grid; gap: 8px; }
+  .agent-head .tag { color: var(--ai); font-weight: 700; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+  .card ul, .card ol { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
+  .card p { color: var(--muted); }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
+  th, td { text-align: left; padding: 10px 14px; border-top: 1px solid var(--rule); vertical-align: top; }
+  thead th { border-top: 0; color: var(--muted); font-weight: 500; font-size: 0.875rem; }
+  td:first-child { white-space: nowrap; font-weight: 600; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; color: var(--muted); font-size: 0.875rem; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .sw { width: 22px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>AdvisorAgent architecture</h1>
+    <p class="lede">
+      Two web portals and one AI assistant share a single backend. Everything an advisor or client sees, including
+      every lookup the AI makes, goes through one <strong>access layer</strong> that reads only accounts the signed-in
+      person has an <code>account_access</code> row for. The <strong>AI agent</strong> (ochre) lives inside the
+      backend: it can ask for data through six read-only tools, but it never sees who it is acting for and never
+      touches the database directly.
+    </p>
+  </header>
+
+  <section class="stage" aria-labelledby="flow-title">
+    <h2 id="flow-title">Follow a request</h2>
+    <div class="controls">
+      <div class="tabs" role="group" aria-label="Choose a request to follow">
+        <button class="tab" type="button" data-scenario="client" id="tab-client"><span class="dot" style="background: var(--client)"></span>Client opens Holdings</button>
+        <button class="tab" type="button" data-scenario="ask" id="tab-ask"><span class="dot" style="background: var(--advisor)"></span>Advisor asks the assistant</button>
+        <button class="tab" type="button" data-scenario="blocked" id="tab-blocked"><span class="dot" style="background: var(--blocked)"></span>Off-topic question is blocked</button>
+      </div>
+      <div class="btns">
+        <button class="btn" type="button" id="play">Pause</button>
+        <button class="btn" type="button" id="next">Next step</button>
+      </div>
+    </div>
+
+    <figure class="canvas" style="margin:0">
+      <svg viewBox="0 0 1200 620" role="img" id="diagram"
+        aria-label="Advisor and client portals call an Angular app, which calls the FastAPI backend. Inside the backend, a sign-in check routes portal requests to the portal endpoints and assistant requests to the AI agent: limits and audit log, a scope check using Claude Haiku 5.5, the agent loop using Claude Sonnet 5.5, and six read-only tools. Both the portal endpoints and the tools read Postgres only through the access layer.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" class="arrowhead" />
+          </marker>
+        </defs>
+
+        <!-- Trusted backend container -->
+        <rect class="zone-api" x="430" y="20" width="510" height="580" rx="14" />
+        <text class="t" x="450" y="44">FastAPI backend</text>
+        <text class="s" x="450" y="60">trusted zone · identity comes from the session, never from the model</text>
+
+        <!-- AI agent zone -->
+        <rect class="zone-ai" x="670" y="74" width="255" height="320" rx="12" />
+        <text class="ai-title" x="690" y="98">AI agent</text>
+
+        <!-- Edges (drawn under nodes). ids are used by the animation. -->
+        <g id="edges">
+          <path id="p1" class="edge" d="M190 150 C215 150 215 230 240 230" marker-end="url(#ah)" />
+          <path id="p2" class="edge" d="M190 340 C215 340 215 262 240 262" marker-end="url(#ah)" />
+          <path id="p3" class="edge" d="M390 245 C420 245 420 105 460 105" marker-end="url(#ah)" />
+          <path id="p4" class="edge" d="M545 130 L545 168" marker-end="url(#ah)" />
+          <path id="p5" class="edge" d="M460 122 L446 122 L446 412 L460 412" marker-end="url(#ah)" />
+          <path id="p6" class="edge" d="M545 438 L545 478" marker-end="url(#ah)" />
+          <path id="p7" class="edge" d="M630 186 C660 186 660 134 690 134" marker-end="url(#ah)" />
+          <path id="p8" class="edge" d="M800 158 L800 174" marker-end="url(#ah)" />
+          <path id="p9" class="edge" d="M910 196 C945 196 945 170 980 170" marker-end="url(#ah)" />
+          <path id="p10" class="edge" d="M800 222 L800 238" marker-end="url(#ah)" />
+          <path id="p11" class="edge" d="M910 262 C945 262 945 232 980 232" marker-end="url(#ah)" />
+          <path id="p12" class="edge" d="M800 292 L800 312" marker-end="url(#ah)" />
+          <path id="p13" class="edge" d="M800 368 L800 478" marker-end="url(#ah)" />
+          <path id="p14" class="edge" d="M920 516 C950 516 950 500 980 500" marker-end="url(#ah)" />
+          <path id="p16" class="edge" d="M690 268 C655 268 655 200 630 200" marker-end="url(#ah)" />
+          <path id="p17" class="edge dash" d="M910 140 C960 140 960 440 980 450" marker-end="url(#ah)" />
+        </g>
+
+        <!-- Edge labels -->
+        <text class="lbl" x="398" y="160" text-anchor="middle" transform="rotate(-90 398 160)">/api + signed-in user</text>
+        <text class="lbl" x="452" y="300" transform="rotate(-90 452 300)" text-anchor="middle">portal pages</text>
+        <text class="lbl" x="553" y="153">chat</text>
+        <text class="lbl" x="953" y="166" text-anchor="middle">classify</text>
+        <text class="lbl" x="953" y="226" text-anchor="middle">tool use</text>
+        <text class="lbl" x="664" y="232" text-anchor="end">answer</text>
+        <text class="lbl" x="808" y="430">tool calls</text>
+        <text class="lbl" x="952" y="538" text-anchor="middle">SQL</text>
+        <text class="lbl" x="966" y="380" text-anchor="end">events</text>
+
+        <!-- Browsers -->
+        <g class="node" id="n_adv">
+          <rect class="box box-adv" x="20" y="110" width="170" height="80" rx="10" />
+          <rect class="band-adv" x="20" y="110" width="8" height="80" rx="3" />
+          <text class="t" x="40" y="142">Advisor portal</text>
+          <text class="s" x="40" y="160">browser, normal window</text>
+          <text class="s" x="40" y="176">/advisor</text>
+        </g>
+        <g class="node" id="n_cli">
+          <rect class="box box-cli" x="20" y="300" width="170" height="80" rx="10" />
+          <rect class="band-cli" x="20" y="300" width="8" height="80" rx="3" />
+          <text class="t" x="40" y="332">Client portal</text>
+          <text class="s" x="40" y="350">browser, private window</text>
+          <text class="s" x="40" y="366">/client</text>
+        </g>
+
+        <!-- Angular -->
+        <g class="node" id="n_web">
+          <rect class="box" x="240" y="195" width="150" height="100" rx="10" />
+          <text class="t" x="256" y="225">Angular app</text>
+          <text class="s" x="256" y="244">web container</text>
+          <text class="s" x="256" y="260">screens, charts, chat</text>
+          <text class="s" x="256" y="276">no security logic</text>
+        </g>
+
+        <!-- Backend inner nodes -->
+        <g class="node" id="n_auth">
+          <rect class="box" x="460" y="80" width="170" height="50" rx="8" />
+          <text class="t" x="474" y="101">Sign-in check</text>
+          <text class="s" x="474" y="118">who + role (Cognito: step 3)</text>
+        </g>
+        <g class="node" id="n_assist">
+          <rect class="box" x="460" y="168" width="170" height="50" rx="8" />
+          <text class="t" x="474" y="189">Assistant endpoint</text>
+          <text class="s" x="474" y="206">loads/saves conversation</text>
+        </g>
+        <g class="node" id="n_portal">
+          <rect class="box" x="460" y="388" width="170" height="50" rx="8" />
+          <text class="t" x="474" y="409">Portal endpoints</text>
+          <text class="s" x="474" y="426">accounts, holdings, gains…</text>
+        </g>
+        <g class="node" id="n_access">
+          <rect class="box" x="460" y="478" width="460" height="76" rx="10" />
+          <text class="t" x="476" y="502">Access layer · “visible accounts”</text>
+          <text class="s" x="476" y="521">every query joins account_access for the signed-in person</text>
+          <text class="s" x="476" y="538">(and the selected client, when one is chosen in the assistant)</text>
+        </g>
+
+        <!-- AI agent nodes -->
+        <g class="node" id="n_limits">
+          <rect class="box-ai" x="690" y="110" width="220" height="48" rx="8" />
+          <text class="t" x="704" y="131">Limits and audit log</text>
+          <text class="s" x="704" y="148">10 a minute, 100 a day</text>
+        </g>
+        <g class="node" id="n_scope">
+          <rect class="box-ai" x="690" y="174" width="220" height="48" rx="8" />
+          <text class="t" x="704" y="195">Scope check</text>
+          <text class="s" x="704" y="212">Haiku 5.5: is this about clients?</text>
+        </g>
+        <g class="node" id="n_loop">
+          <rect class="box-ai" x="690" y="238" width="220" height="54" rx="8" />
+          <text class="t" x="704" y="259">Agent loop</text>
+          <text class="s" x="704" y="276">Sonnet 5.5 plans tool calls,</text>
+          <text class="s" x="704" y="289">writes and checks the answer</text>
+        </g>
+        <g class="node" id="n_tools">
+          <rect class="box-ai" x="690" y="312" width="220" height="56" rx="8" />
+          <text class="t" x="704" y="333">6 read-only tools</text>
+          <text class="s" x="704" y="350">run as the signed-in advisor;</text>
+          <text class="s" x="704" y="363">the model never supplies advisor_id</text>
+        </g>
+
+        <!-- External: Anthropic -->
+        <g class="node" id="n_claude">
+          <rect class="box" x="980" y="120" width="200" height="150" rx="10" />
+          <text class="t" x="996" y="146">Anthropic API</text>
+          <text class="s" x="996" y="164">outside the backend</text>
+          <line x1="996" y1="178" x2="1164" y2="178" stroke="var(--rule)" />
+          <text class="s" x="996" y="200" style="fill: var(--ai)">Claude Haiku 5.5</text>
+          <text class="s" x="996" y="216">scope check, about $0.0002</text>
+          <text class="s" x="996" y="240" style="fill: var(--ai)">Claude Sonnet 5.5</text>
+          <text class="s" x="996" y="256">tool use and answers</text>
+        </g>
+
+        <!-- Postgres -->
+        <g class="node" id="n_db">
+          <rect class="box" x="980" y="400" width="200" height="200" rx="10" />
+          <text class="t" x="996" y="426">Postgres</text>
+          <text class="s" x="996" y="444">RDS on AWS (step 5)</text>
+          <line x1="996" y1="456" x2="1164" y2="456" stroke="var(--rule)" />
+          <text class="s" x="996" y="476">account_access (the ACL)</text>
+          <text class="s" x="996" y="493">accounts, holdings,</text>
+          <text class="s" x="996" y="510">transactions, performance</text>
+          <text class="s" x="996" y="530">agent_conversations</text>
+          <text class="s" x="996" y="547">answer_cache</text>
+          <text class="s" x="996" y="564">assistant_events</text>
+        </g>
+
+        <!-- Moving packet -->
+        <g id="packet" aria-hidden="true" style="visibility:hidden">
+          <circle class="halo" r="12" />
+          <circle class="packet" r="6" />
+        </g>
+      </svg>
+    </figure>
+
+    <div class="now" aria-live="polite">
+      <span class="num" id="now-num">1</span>
+      <p id="now-text"></p>
+    </div>
+    <ol class="steps" id="steps"></ol>
+
+    <div class="legend" aria-label="Legend">
+      <span><span class="sw" style="background: var(--ai-soft); border: 1.5px solid var(--ai-line)"></span>AI agent</span>
+      <span><span class="sw" style="background: var(--sunk); border: 1.25px dashed var(--line)"></span>Trusted backend</span>
+      <span><span class="sw" style="border-top: 2px dashed var(--line); height: 0; width: 22px"></span>audit write</span>
+    </div>
+  </section>
+
+  <section class="agent" aria-labelledby="agent-title">
+    <div class="agent-head">
+      <span class="tag">The AI agent</span>
+      <h2 id="agent-title">What it is and what it does</h2>
+      <p class="lede" style="margin-top:0">
+        The advisor's "Advanced Assistant". It turns a plain-English question into a few precise lookups, reads the
+        results and writes an answer. It runs inside the FastAPI backend, uses Claude through the Anthropic API, and
+        reaches data only through tools the backend defines. It is a manual tool-use loop, so every step is code you
+        can read in <code>backend/src/wealth/agent/loop.py</code>.
+      </p>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>How one question is answered</h3>
+        <ol>
+          <li>Limits are checked and the request is logged.</li>
+          <li>Haiku 5.5 checks the question is about the advisor's clients.</li>
+          <li>Sonnet 5.5 gets the question and the tool list (no <code>advisor_id</code> in it).</li>
+          <li>Sonnet asks for tools; the backend runs each one as the signed-in advisor.</li>
+          <li>Results go back; Sonnet repeats (up to 10 rounds) or answers.</li>
+          <li>The answer is checked, cached, and saved with the conversation.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>Its six tools</h3>
+        <ul>
+          <li><code>get_my_clients</code>: clients the advisor shares an account with</li>
+          <li><code>get_accounts</code>: one client's shared accounts</li>
+          <li><code>get_holdings</code>: positions, sector and asset-class mix, with filters</li>
+          <li><code>get_transactions</code>: activity and realized gains, with filters</li>
+          <li><code>get_performance</code>: returns from 1 day to 5 years</li>
+          <li><code>find_reviews_due</code>: reviews due soon or overdue</li>
+        </ul>
+        <p>All math (totals, weights, gains) is done in SQL, not by the model.</p>
+      </div>
+      <div class="card">
+        <h3>Guardrails</h3>
+        <ul>
+          <li><strong>Limits:</strong> 10 a minute and 100 a day per advisor.</li>
+          <li><strong>Scope check:</strong> off-topic and manipulation are blocked before Sonnet runs; fails closed.</li>
+          <li><strong>Facts only:</strong> no buy or sell recommendations.</li>
+          <li><strong>Selected client:</strong> a hard scope in the access layer.</li>
+          <li><strong>Answer check:</strong> figures must come from looked-up data.</li>
+          <li><strong>Audit log:</strong> every request, with its outcome.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>What it can never do</h3>
+        <ul>
+          <li>Choose or change who it acts for. <code>advisor_id</code> comes from the session.</li>
+          <li>Write SQL or touch the database. It only calls the six tools.</li>
+          <li>Change data. Tools run in read-only transactions.</li>
+          <li>See accounts without an <code>account_access</code> row. Unknown and forbidden IDs look identical.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="run-title" style="display:grid; gap:16px">
+    <h2 id="run-title">Where each part runs</h2>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th scope="col">Part</th><th scope="col">Locally today (<code>docker compose up</code>)</th><th scope="col">On AWS (build step 5)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Angular app</td><td><code>web</code> container, <code>ng serve</code> on port 4200</td><td>Static build behind the same domain</td></tr>
+          <tr><td>FastAPI + AI agent</td><td><code>api</code> container, port 8000, live reload</td><td>ECS Express Mode, same image</td></tr>
+          <tr><td>Sign-in</td><td>Demo user picker (refused on AWS)</td><td>Cognito: advisors, clients, admins groups</td></tr>
+          <tr><td>Database</td><td><code>db</code> container, Postgres 17</td><td>RDS Postgres</td></tr>
+          <tr><td>Secrets</td><td><code>.env</code>, never committed</td><td>Secrets Manager</td></tr>
+          <tr><td>Claude</td><td>Anthropic API</td><td>Anthropic API or Amazon Bedrock</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  // Each step lights a node and moves the packet along one or more edges ([edgeId, reverse]).
+  const SCENARIOS = {
+    client: {
+      color: 'var(--client)',
+      steps: [
+        { node: 'n_cli', edges: [['p2']], text: 'Shelby Moody opens Holdings in the client portal.' },
+        { node: 'n_web', edges: [['p3']], text: 'The Angular app calls <code>/api/client/holdings</code> with the signed-in user. The browser never sends a client ID.' },
+        { node: 'n_auth', edges: [['p5']], text: 'The sign-in check confirms Shelby exists and is a client. Advisor routes would return 403.' },
+        { node: 'n_portal', edges: [['p6']], text: 'The holdings endpoint scopes to Shelby herself. An account ID that is not hers returns 404.' },
+        { node: 'n_access', edges: [['p14']], text: 'The access layer reads only accounts with an <code>account_access</code> row for Shelby, in a read-only transaction.' },
+        { node: 'n_cli', edges: [['p14', true], ['p6', true], ['p5', true], ['p3', true], ['p2', true]], text: 'Positions, sector mix and totals (computed in SQL) return to the page and its charts.' },
+      ],
+    },
+    ask: {
+      color: 'var(--advisor)',
+      steps: [
+        { node: 'n_adv', edges: [['p1']], text: 'Anthony asks: “Which of my clients are overweight in tech and have a review due this month?”' },
+        { node: 'n_auth', edges: [['p3']], text: 'The sign-in check confirms Anthony is an advisor.' },
+        { node: 'n_assist', edges: [['p4']], text: 'The assistant endpoint loads the conversation from Postgres.' },
+        { node: 'n_limits', edges: [['p7'], ['p17']], text: '<strong>AI agent:</strong> limits check (10 a minute, 100 a day) and an audit row in <code>assistant_events</code>.' },
+        { node: 'n_scope', edges: [['p8'], ['p9'], ['p9', true]], text: '<strong>AI agent:</strong> Claude Haiku 5.5 classifies the question as in scope (fixed JSON format).' },
+        { node: 'n_loop', edges: [['p10'], ['p11']], text: '<strong>AI agent:</strong> the loop sends the question and six tool definitions to Claude Sonnet 5.5. Nothing in them says who Anthony is.' },
+        { node: 'n_loop', edges: [['p11', true]], text: 'Sonnet replies with tool calls: <code>find_reviews_due</code>, then <code>get_holdings</code> for each client, Technology only.' },
+        { node: 'n_tools', edges: [['p12'], ['p13'], ['p14']], text: '<strong>AI agent:</strong> the backend runs each tool as Anthony, through the access layer. Only his accounts are readable.' },
+        { node: 'n_loop', edges: [['p14', true], ['p13', true], ['p12', true], ['p11']], text: 'Results go back to Sonnet, which writes the answer.' },
+        { node: 'n_loop', edges: [['p11', true]], text: '<strong>AI agent:</strong> answer check: figures must come from looked-up data. The answer is cached and the conversation saved.' },
+        { node: 'n_adv', edges: [['p16'], ['p4', true], ['p3', true], ['p1', true]], text: 'The answer appears in the chat with a list of every lookup it used.' },
+      ],
+    },
+    blocked: {
+      color: 'var(--blocked)',
+      steps: [
+        { node: 'n_adv', edges: [['p1']], text: 'Anthony asks: “What is the diameter of the moon?”' },
+        { node: 'n_assist', edges: [['p3'], ['p4']], text: 'Signed in as an advisor; the request reaches the assistant endpoint.' },
+        { node: 'n_limits', edges: [['p7'], ['p17']], text: '<strong>AI agent:</strong> the request is counted and logged.' },
+        { node: 'n_scope', edges: [['p8'], ['p9'], ['p9', true]], text: '<strong>AI agent:</strong> Claude Haiku 5.5 classifies it as out of scope.' },
+        { node: 'n_adv', edges: [['p7', true], ['p4', true], ['p3', true], ['p1', true]], text: 'The backend returns a fixed reply. Sonnet is never called, nothing is cached, and the event is logged as <code>blocked_scope</code>.' },
+      ],
+    },
+  };
+
+  const svg = document.getElementById('diagram');
+  const packet = document.getElementById('packet');
+  const stepsEl = document.getElementById('steps');
+  const nowNum = document.getElementById('now-num');
+  const nowText = document.getElementById('now-text');
+  const playBtn = document.getElementById('play');
+  const nextBtn = document.getElementById('next');
+  const tabs = [...document.querySelectorAll('.tab')];
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let scenario = 'ask';
+  let index = 0;
+  let playing = !reduceMotion;
+  let token = 0; // cancels an in-flight animation when the user changes something
+
+  const PX_PER_MS = 0.32;
+  const HOLD_MS = 1300;
+
+  function clearHighlights() {
+    svg.querySelectorAll('.on').forEach((el) => el.classList.remove('on'));
+  }
+
+  function renderSteps() {
+    const s = SCENARIOS[scenario];
+    document.documentElement.style.setProperty('--packet', s.color);
+    stepsEl.innerHTML = '';
+    s.steps.forEach((step, i) => {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.innerHTML = step.text; // one grid cell, so bold and code stay inline
+      li.appendChild(span);
+      li.tabIndex = 0;
+      li.addEventListener('click', () => go(i, false));
+      li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(i, false); } });
+      stepsEl.appendChild(li);
+    });
+    tabs.forEach((t) => t.setAttribute('aria-pressed', String(t.dataset.scenario === scenario)));
+  }
+
+  function markStep(i) {
+    const s = SCENARIOS[scenario];
+    [...stepsEl.children].forEach((li, j) => {
+      li.classList.toggle('on', j === i);
+      li.classList.toggle('done', j < i);
+    });
+    nowNum.textContent = String(i + 1);
+    nowText.innerHTML = s.steps[i].text;
+    clearHighlights();
+    const node = document.getElementById(s.steps[i].node);
+    if (node) node.classList.add('on');
+  }
+
+  function travel(edgeId, reverse, my) {
+    return new Promise((resolve) => {
+      const path = document.getElementById(edgeId);
+      if (!path) return resolve();
+      path.classList.add('on');
+      const len = path.getTotalLength();
+      if (reduceMotion) {
+        const p = path.getPointAtLength(reverse ? 0 : len);
+        packet.setAttribute('transform', `translate(${p.x} ${p.y})`);
+        packet.style.visibility = 'visible';
+        return resolve();
+      }
+      const dur = Math.max(260, len / PX_PER_MS);
+      const start = performance.now();
+      packet.style.visibility = 'visible';
+      const frame = (now) => {
+        if (my !== token) return resolve();
+        const t = Math.min(1, (now - start) / dur);
+        const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const d = (reverse ? 1 - eased : eased) * len;
+        const p = path.getPointAtLength(d);
+        packet.setAttribute('transform', `translate(${p.x} ${p.y})`);
+        if (t < 1) requestAnimationFrame(frame); else resolve();
+      };
+      requestAnimationFrame(frame);
+    });
+  }
+
+  async function runStep(i, my) {
+    markStep(i);
+    for (const [edge, rev] of SCENARIOS[scenario].steps[i].edges) {
+      if (my !== token) return;
+      await travel(edge, !!rev, my);
+    }
+  }
+
+  function wait(ms, my) {
+    return new Promise((r) => setTimeout(() => r(my === token), ms));
+  }
+
+  async function loop(my) {
+    while (playing && my === token) {
+      await runStep(index, my);
+      if (!(await wait(HOLD_MS, my))) return;
+      const total = SCENARIOS[scenario].steps.length;
+      index = (index + 1) % total;
+      if (index === 0 && !(await wait(900, my))) return;
+    }
+  }
+
+  function go(i, keepPlaying = playing) {
+    token++;
+    index = i;
+    playing = keepPlaying && !reduceMotion;
+    updatePlay();
+    const my = token;
+    if (playing) loop(my); else runStep(index, my);
+  }
+
+  function setScenario(name) {
+    scenario = name;
+    renderSteps();
+    go(0, !reduceMotion);
+  }
+
+  function updatePlay() {
+    playBtn.textContent = playing ? 'Pause' : 'Play';
+    playBtn.setAttribute('aria-pressed', String(!playing));
+  }
+
+  tabs.forEach((t) => t.addEventListener('click', () => setScenario(t.dataset.scenario)));
+  playBtn.addEventListener('click', () => {
+    if (playing) { playing = false; token++; updatePlay(); markStep(index); }
+    else { go(index, true); playing = !reduceMotion; if (reduceMotion) go((index + 1) % SCENARIOS[scenario].steps.length, false); }
+  });
+  nextBtn.addEventListener('click', () => go((index + 1) % SCENARIOS[scenario].steps.length, false));
+
+  renderSteps();
+  if (reduceMotion) { playBtn.textContent = 'Next'; playBtn.hidden = true; }
+  go(0, !reduceMotion);
+})();
+</script>
