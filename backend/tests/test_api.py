@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from tests.fixtures import A1, A2, A3, C1, C2, C3, C4, J, K, X, Y, Z
 from tests.test_agent_loop import FakeClient, reply, text, tool_use
+from tests.test_guard import FakeGuard
 from wealth.api import deps, routes_advisor
 from wealth.api.main import create_app
 from wealth.config import get_settings
@@ -24,7 +25,12 @@ def fake_llm():
 
 
 @pytest.fixture
-def api(conn, fake_llm, monkeypatch):
+def fake_guard():
+    return FakeGuard("in_scope")
+
+
+@pytest.fixture
+def api(conn, fake_llm, fake_guard, monkeypatch):
     monkeypatch.setenv("DEMO_AUTH_ENABLED", "true")
     for name in ("ECS_CONTAINER_METADATA_URI_V4", "ECS_CONTAINER_METADATA_URI", "AWS_EXECUTION_ENV"):
         monkeypatch.delenv(name, raising=False)
@@ -39,6 +45,7 @@ def api(conn, fake_llm, monkeypatch):
     app.dependency_overrides[deps.get_agent_conn] = lambda: conn
     app.dependency_overrides[deps.get_llm_client] = lambda: fake_llm
     app.dependency_overrides[routes_advisor.get_store] = lambda: store
+    app.dependency_overrides[routes_advisor.get_guard] = lambda: fake_guard
     with TestClient(app) as client:
         yield client
     get_settings.cache_clear()
@@ -251,3 +258,69 @@ def test_assistant_rejects_unknown_fields_and_long_messages(api):
         ).status_code
         == 403
     )
+
+
+# --- guardrails ------------------------------------------------------------------------------------------
+
+
+def events(conn):
+    return conn.execute("SELECT outcome, question, reason FROM assistant_events ORDER BY id").fetchall()
+
+
+def test_off_topic_question_is_blocked_and_logged(api, fake_llm, fake_guard, conn):
+    fake_guard.category = "out_of_scope"
+    r = ask(api, A1, message="What is the diameter of the moon?").json()
+    assert r["blocked"] is True and r["stop_reason"] == "blocked_scope" and fake_llm.requests == []
+    assert events(conn) == [
+        {
+            "outcome": "blocked_scope",
+            "question": "What is the diameter of the moon?",
+            "reason": "fake out_of_scope",
+        }
+    ]
+
+
+def test_answered_question_is_logged(api, fake_llm, conn):
+    fake_llm.responses += [reply("end_turn", text("hello"))]
+    assert ask(api, A1, message="hi").json()["blocked"] is False
+    assert [e["outcome"] for e in events(conn)] == ["answered"]
+
+
+def test_per_minute_limit(api, fake_llm, conn, monkeypatch):
+    monkeypatch.setenv("ASSISTANT_PER_MINUTE", "2")
+    get_settings.cache_clear()
+    fake_llm.responses += [reply("end_turn", text("a")), reply("end_turn", text("b"))]
+    assert ask(api, A1, message="one").status_code == 200
+    assert ask(api, A1, message="two").status_code == 200
+    third = ask(api, A1, message="three")
+    assert third.status_code == 429 and third.headers["Retry-After"] == "60"
+    assert "a minute" in third.json()["detail"]
+    assert [e["outcome"] for e in events(conn)] == ["answered", "answered", "rate_limited"]
+    # Limits are per advisor.
+    fake_llm.responses += [reply("end_turn", text("c"))]
+    assert ask(api, A2, message="other advisor").status_code == 200
+
+
+def test_daily_cap(api, conn, monkeypatch):
+    monkeypatch.setenv("ASSISTANT_PER_DAY", "3")
+    get_settings.cache_clear()
+    conn.execute(
+        "INSERT INTO assistant_events (advisor_id, created_at, outcome, question)"
+        " SELECT %s, now() - interval '30 minutes', 'answered', 'q' FROM generate_series(1, 3)",
+        (A1,),
+    )
+    r = ask(api, A1, message="one more")
+    assert r.status_code == 429 and "today's limit" in r.json()["detail"]
+    assert int(r.headers["Retry-After"]) > 0
+
+
+def test_rate_limited_attempts_do_not_count(api, fake_llm, conn, monkeypatch):
+    monkeypatch.setenv("ASSISTANT_PER_MINUTE", "1")
+    get_settings.cache_clear()
+    conn.execute(
+        "INSERT INTO assistant_events (advisor_id, outcome, question)"
+        " SELECT %s, 'rate_limited', 'spam' FROM generate_series(1, 50)",
+        (A1,),
+    )
+    fake_llm.responses += [reply("end_turn", text("ok"))]
+    assert ask(api, A1, message="real question").status_code == 200

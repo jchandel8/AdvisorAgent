@@ -18,6 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 DEMO_USERS_CSV = REPO_ROOT / "demo_users.csv"
 
 TABLES = [
+    "assistant_events",
     "agent_conversations",
     "demo_users",
     "answer_cache",

@@ -28,6 +28,7 @@ interface Message {
   toolCalls?: ToolCall[];
   fromCache?: boolean;
   error?: boolean;
+  blocked?: boolean;
 }
 
 const MAX_LENGTH = 2000;
@@ -134,6 +135,13 @@ const MAX_LENGTH = 2000;
                     </button>
                   </div>
                 </div>
+              } @else if (m.blocked) {
+                <p
+                  class="flex items-start gap-3 rounded-[var(--radius-control)] border border-rule bg-surface-sunk p-4"
+                >
+                  <app-icon name="shield" class="mt-0.5 text-advisor" />
+                  <span>{{ m.text }}</span>
+                </p>
               } @else {
                 <div class="answer" [innerHTML]="m.html"></div>
                 <details
@@ -335,6 +343,7 @@ export class Assistant {
             html: renderMarkdown(reply.answer),
             toolCalls: reply.tool_calls,
             fromCache: reply.from_cache,
+            blocked: reply.blocked,
           });
           this.pending.set(false);
           this.scrollToEnd();
