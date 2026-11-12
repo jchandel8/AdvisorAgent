@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { Router, Routes } from '@angular/router';
 import { Auth } from './core/auth';
-import { Session, demoModeGuard, portalGuard, signInPath } from './core/session';
+import { Session, portalGuard, signInPath } from './core/session';
 import { ShellData } from './layout/shell';
 
 const clientShell: ShellData = {
@@ -27,12 +27,23 @@ const advisorShell: ShellData = {
   ],
 };
 
+const adminShell: ShellData = {
+  portal: 'admin',
+  title: 'Admin portal',
+  nav: [
+    { path: '/admin/users', label: 'Users', icon: 'users' },
+    { path: '/admin/accounts', label: 'Accounts', icon: 'briefcase' },
+    { path: '/admin/permissions', label: 'Permissions', icon: 'shield' },
+    { path: '/admin/audit', label: 'Audit log', icon: 'table' },
+    { path: '/admin/assistant', label: 'Assistant log', icon: 'chat' },
+  ],
+};
+
 const profile = () => import('./pages/profile').then((m) => m.Profile);
 
 export const routes: Routes = [
   {
     path: 'demo',
-    canActivate: [demoModeGuard],
     title: 'Choose a demo user · AdvisorAgent',
     loadComponent: () => import('./pages/demo/demo').then((m) => m.Demo),
   },
@@ -100,6 +111,40 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/advisor/assistant').then((m) => m.Assistant),
       },
       { path: 'profile', title: 'Profile · Advisor portal', loadComponent: profile },
+    ],
+  },
+  {
+    path: 'admin',
+    canActivate: [portalGuard('admin')],
+    data: adminShell,
+    loadComponent: () => import('./layout/shell').then((m) => m.Shell),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'users' },
+      {
+        path: 'users',
+        title: 'Users · Admin portal',
+        loadComponent: () => import('./pages/admin/users').then((m) => m.AdminUsers),
+      },
+      {
+        path: 'accounts',
+        title: 'Accounts · Admin portal',
+        loadComponent: () => import('./pages/admin/accounts').then((m) => m.AdminAccounts),
+      },
+      {
+        path: 'permissions',
+        title: 'Permissions · Admin portal',
+        loadComponent: () => import('./pages/admin/permissions').then((m) => m.AdminPermissions),
+      },
+      {
+        path: 'audit',
+        title: 'Audit log · Admin portal',
+        loadComponent: () => import('./pages/admin/logs').then((m) => m.AdminAudit),
+      },
+      {
+        path: 'assistant',
+        title: 'Assistant log · Admin portal',
+        loadComponent: () => import('./pages/admin/logs').then((m) => m.AdminAssistantLog),
+      },
     ],
   },
   {

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from wealth.api import queries
 from wealth.api.deps import CurrentUser, current_user, demo_auth_allowed, get_conn
@@ -21,14 +21,14 @@ def health(conn=Depends(get_conn)):
 
 @router.get("/me")
 def me(user: CurrentUser = Depends(current_user)):
-    return {"kind": user.viewer.kind, "id": user.viewer.id, "name": user.name, "portal": user.portal}
+    return {"kind": user.kind, "id": user.id, "name": user.name, "portal": user.portal}
 
 
 @router.get("/demo/users")
 def demo_users(conn=Depends(get_conn)):
-    """The demo user picker. Exists only while the local demo login is enabled."""
-    if not demo_auth_allowed():
-        raise HTTPException(404, "Not found.")
+    """Demo users and what each can see: the picker locally, the "who to sign in as" page on AWS.
+    Public on purpose (mock people, usernames only, never passwords). Signing in still needs a password
+    (Cognito) or the local-only demo mode."""
     return {"users": queries.demo_users(conn, date.today())}
 
 

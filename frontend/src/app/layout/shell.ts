@@ -20,7 +20,7 @@ export interface NavItem {
 }
 
 export interface ShellData {
-  portal: 'advisor' | 'client';
+  portal: 'advisor' | 'client' | 'admin';
   title: string;
   nav: NavItem[];
 }
@@ -46,8 +46,9 @@ export interface ShellData {
       >
         <div
           class="px-5 py-4 text-paper"
-          [class.bg-advisor]="isAdvisor()"
-          [class.bg-client]="!isAdvisor()"
+          [class.bg-advisor]="portal() === 'advisor'"
+          [class.bg-client]="portal() === 'client'"
+          [class.bg-admin]="portal() === 'admin'"
         >
           <p class="text-lg leading-tight font-semibold">{{ data().title }}</p>
           <p class="text-sm opacity-85">AdvisorAgent</p>
@@ -65,8 +66,9 @@ export interface ShellData {
                   class="flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-ink-muted transition-colors duration-150 hover:bg-surface-sunk hover:text-ink"
                   [class.font-semibold]="rla.isActive"
                   [class.text-ink]="rla.isActive"
-                  [class.bg-advisor-soft]="rla.isActive && isAdvisor()"
-                  [class.bg-client-soft]="rla.isActive && !isAdvisor()"
+                  [class.bg-advisor-soft]="rla.isActive && portal() === 'advisor'"
+                  [class.bg-client-soft]="rla.isActive && portal() === 'client'"
+                  [class.bg-admin-soft]="rla.isActive && portal() === 'admin'"
                 >
                   <app-icon [name]="item.icon" />
                   {{ item.label }}
@@ -128,8 +130,9 @@ export interface ShellData {
               #rla="routerLinkActive"
               [attr.aria-current]="rla.isActive ? 'page' : null"
               class="flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs text-ink-muted"
-              [class.text-advisor]="rla.isActive && isAdvisor()"
-              [class.text-client]="rla.isActive && !isAdvisor()"
+              [class.text-advisor]="rla.isActive && portal() === 'advisor'"
+              [class.text-client]="rla.isActive && portal() === 'client'"
+              [class.text-admin]="rla.isActive && portal() === 'admin'"
               [class.font-semibold]="rla.isActive"
             >
               <app-icon [name]="item.icon" [size]="20" />
@@ -151,7 +154,7 @@ export class Shell {
   protected readonly data = toSignal(this.route.data.pipe(map((d) => d as ShellData)), {
     initialValue: this.route.snapshot.data as ShellData,
   });
-  protected readonly isAdvisor = computed(() => this.data().portal === 'advisor');
+  protected readonly portal = computed(() => this.data().portal);
   protected readonly user = this.session.user;
 
   protected switchUser(): void {

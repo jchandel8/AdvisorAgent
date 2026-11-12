@@ -2,7 +2,16 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
+  AccountAccess,
   AccountList,
+  AdminAccount,
+  AdminUser,
+  AssistantEvent,
+  AuditEvent,
+  NewAccount,
+  NewUser,
+  Paged,
+  Person,
   AdvisorProfile,
   AssistantReply,
   Book,
@@ -96,5 +105,61 @@ export class Api {
     client_id: number | null;
   }): Observable<AssistantReply> {
     return this.http.post<AssistantReply>('/api/advisor/assistant/messages', body);
+  }
+
+  // Admin portal
+  adminUsers(kind: 'advisor' | 'client' | 'admin', q: string): Observable<{ users: AdminUser[] }> {
+    return this.http.get<{ users: AdminUser[] }>('/api/admin/users', {
+      params: this.params({ kind, q }),
+    });
+  }
+  createUser(
+    body: NewUser,
+  ): Observable<{ id: number; username: string; name: string; kind: string }> {
+    return this.http.post<{ id: number; username: string; name: string; kind: string }>(
+      '/api/admin/users',
+      body,
+    );
+  }
+  adminAccounts(q: string): Observable<{ accounts: AdminAccount[] }> {
+    return this.http.get<{ accounts: AdminAccount[] }>('/api/admin/accounts', {
+      params: this.params({ q }),
+    });
+  }
+  createAccount(body: NewAccount): Observable<{ account_id: number; account_name: string }> {
+    return this.http.post<{ account_id: number; account_name: string }>(
+      '/api/admin/accounts',
+      body,
+    );
+  }
+  accountAccess(accountId: number): Observable<AccountAccess> {
+    return this.http.get<AccountAccess>(`/api/admin/accounts/${accountId}/access`);
+  }
+  findPeople(
+    q: string,
+    kind: 'advisor' | 'client' | null = null,
+  ): Observable<{ people: Person[] }> {
+    return this.http.get<{ people: Person[] }>('/api/admin/people', {
+      params: this.params({ q, kind }),
+    });
+  }
+  grant(body: {
+    account_id: number;
+    person_type: string;
+    person_id: number;
+    role: string;
+  }): Observable<unknown> {
+    return this.http.post('/api/admin/access', body);
+  }
+  revoke(accessId: number): Observable<unknown> {
+    return this.http.delete(`/api/admin/access/${accessId}`);
+  }
+  auditLog(page: number): Observable<Paged<AuditEvent>> {
+    return this.http.get<Paged<AuditEvent>>('/api/admin/audit', { params: this.params({ page }) });
+  }
+  assistantLog(page: number, blockedOnly: boolean): Observable<Paged<AssistantEvent>> {
+    return this.http.get<Paged<AssistantEvent>>('/api/admin/assistant-events', {
+      params: this.params({ page, blocked_only: String(blockedOnly) }),
+    });
   }
 }

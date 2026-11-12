@@ -22,6 +22,7 @@ LATEST = date(2026, 11, 10)
 PRIOR = date(2026, 10, 31)
 
 A1, A2, A3 = 101, 102, 103
+ADMIN = 901
 C1, C2, C3, C4 = 201, 202, 203, 204
 X, Y, J, Z, K, W = 301, 302, 303, 304, 305, 306
 ALL_ACCOUNTS = [X, Y, J, Z, K, W]
@@ -76,6 +77,11 @@ PERFORMANCE = [
 
 def load_fixture(conn: psycopg.Connection) -> None:
     cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO admins (id, username, first_name, last_name, email) OVERRIDING SYSTEM VALUE"
+        " VALUES (%s, 'admin901', 'Ada', 'Admin', 'admin901@example.com')",
+        (ADMIN,),
+    )
     cur.executemany(
         "INSERT INTO advisors (id, username, first_name, last_name, email) OVERRIDING SYSTEM VALUE "
         "VALUES (%s, %s, %s, %s, %s)",

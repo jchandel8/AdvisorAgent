@@ -19,6 +19,8 @@
   --advisor-soft: #e3efeb;
   --client: #2e3a8c;
   --client-soft: #e6e8f6;
+  --admin: #3e4652;
+  --admin-soft: #e8eaee;
   --gain: #17663f;
   --loss: #a3261b;
   --focus: #1d5fd1;
@@ -51,6 +53,8 @@
   --advisor-soft: #1d3530;
   --client: #9faaf5;
   --client-soft: #232a4d;
+  --admin: #c3cad6;
+  --admin-soft: #262d36;
   --gain: #5cc38c;
   --loss: #f08a7e;
   --focus: #7aa7ff;
@@ -82,6 +86,8 @@
   --color-advisor-soft: var(--advisor-soft);
   --color-client: var(--client);
   --color-client-soft: var(--client-soft);
+  --color-admin: var(--admin);
+  --color-admin-soft: var(--admin-soft);
   --color-gain: var(--gain);
   --color-loss: var(--loss);
   --color-focus: var(--focus);

@@ -23,18 +23,20 @@ import psycopg
 
 from wealth.config import get_settings
 
-GROUP_FOR = {"advisor": "advisors", "client": "clients"}
+GROUP_FOR = {"advisor": "advisors", "client": "clients", "admin": "admins"}
 
 
 def demo_people(conn: psycopg.Connection) -> list[dict]:
     return conn.execute(
         """SELECT d.person_type AS kind,
-                  coalesce(a.username, c.username) AS username,
-                  coalesce(a.email, c.email) AS email,
-                  coalesce(a.first_name || ' ' || a.last_name, c.first_name || ' ' || c.last_name) AS name
+                  coalesce(a.username, c.username, m.username) AS username,
+                  coalesce(a.email, c.email, m.email) AS email,
+                  coalesce(a.first_name || ' ' || a.last_name, c.first_name || ' ' || c.last_name,
+                           m.first_name || ' ' || m.last_name) AS name
            FROM demo_users d
            LEFT JOIN advisors a ON a.id = d.advisor_id
            LEFT JOIN clients c ON c.id = d.client_id
+           LEFT JOIN admins m ON m.id = d.admin_id
            ORDER BY d.sort_order""",
     ).fetchall()
 

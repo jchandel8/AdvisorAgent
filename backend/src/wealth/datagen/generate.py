@@ -61,6 +61,7 @@ class Dataset:
     performance: list[tuple]  # account_id, as_of_date, return_1d .. return_5y
     documents: list[tuple]  # account_id, title, doc_type, text, size_kb, created_date
     demo: dict = field(default_factory=dict)
+    admins: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -742,7 +743,19 @@ def generate(anchor: date, seed: int = SEED) -> Dataset:
         },
     }
 
+    # One fixed demo administrator (not from Faker, so the advisor and client data stay identical).
+    admins = [
+        {
+            "id": 1,
+            "username": "morgan.lee",
+            "first_name": "Morgan",
+            "last_name": "Lee",
+            "email": "morgan.lee@example.com",
+        }
+    ]
+
     return Dataset(
+        admins=admins,
         anchor=anchor,
         advisors=advisors,
         clients=clients,

@@ -116,9 +116,7 @@ export class Auth {
       );
     }
     const me = (await res.json()) as Me;
-    if (me.kind === 'advisor' || me.kind === 'client') {
-      this.session.signIn({ kind: me.kind, id: me.id, name: me.name }, { persist: false });
-    }
+    this.session.signIn({ kind: me.kind, id: me.id, name: me.name }, { persist: false });
     return me;
   }
 }
