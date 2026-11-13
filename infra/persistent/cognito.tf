@@ -80,6 +80,12 @@ resource "aws_cognito_user_pool_client" "web" {
 
   prevent_user_existence_errors = "ENABLED"
   enable_token_revocation       = true
+
+  # The AWS app URL changes when the demo is torn down and redeployed, so the Deploy workflow keeps these
+  # lists current (infra/scripts/cognito_allow_url.py). app_urls only sets them when the client is created.
+  lifecycle {
+    ignore_changes = [callback_urls, logout_urls]
+  }
 }
 
 resource "aws_cognito_user_pool_domain" "hosted" {
