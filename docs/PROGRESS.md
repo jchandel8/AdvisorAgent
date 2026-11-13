@@ -228,6 +228,26 @@ not the guard, is the access control; the guard is a cost and misuse filter.
 Demo advisors 1 and 2 (most clients); 9 tech-overweight clients (55-70% tech) with reviews this month;
 demo split client 10 (advisor 2 sees only some accounts); joint demo client 63. See demo_users.csv.
 
+## Plan for 2026-11-14 (agreed 2026-11-13)
+
+AWS changes (deploy, teardown, IAM, Bedrock access) still need the owner's explicit yes each time.
+
+1. Verify the redeploy after the teardown test: startup logs, sign-in on the new URL, and that
+   `cognito_allow_url.py` added the new URL and removed the old `.on.aws` one (its first real run).
+2. Bedrock (own branch, before the admin drilldowns): confirm the region/inference profile and model ID for
+   Sonnet 5.5 and Haiku 5.5; `LLM_PROVIDER` setting (anthropic locally, bedrock on AWS) with tests for both
+   clients; task role gets `bedrock:InvokeModel` on Claude models only; drop the API key secret from the task;
+   owner enables model access in the Bedrock console (add to DEPLOY.md); redeploy and ask a live question;
+   update the diagrams and interview guide. Trade-off: no server-side `fallbacks` on Bedrock.
+3. Admin drilldowns + Documents screen (branch). Owner to confirm 3 decisions first (recommended: admins may
+   view/download documents with each view/download audited; download as .txt; record uploader only, S3
+   uploads later). Client/advisor -> profile + accounts; account -> details + users; admin -> profile + own
+   audit log; Documents list -> details (uploader, dates, download). Works locally and on AWS.
+4. Hardening (small): narrow the deploy role from AdministratorAccess; branch protection on main; Playwright
+   e2e in CI; README with screenshots; short demo video.
+5. Later: step 6 (MCP server, document search, guardrails, evals, tracing), then the suggestions
+   multi-agent system (router, facts agent, suggestions agent on Opus, reviewer, advisor-responsibility footnote).
+
 ## Known follow-ups
 
 - The example question still makes ~16 tool calls (one per client due). About $0.06 on Sonnet, $0.003 on Haiku; the answer cache makes repeats free. Optional

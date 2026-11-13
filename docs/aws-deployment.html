@@ -120,6 +120,22 @@
   th, td { text-align: left; padding: 10px 14px; border-top: 1px solid var(--rule); vertical-align: top; }
   thead th { border-top: 0; color: var(--muted); font-weight: 500; font-size: 0.875rem; }
   td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .iamfig { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; margin: 0; overflow-x: auto; }
+  .iamfig svg { display: block; width: 100%; min-width: 760px; height: auto; }
+  .iamfig figcaption { padding: 12px 18px 16px; color: var(--muted); font-size: 0.875rem; border-top: 1px solid var(--rule); }
+  .iamfig .hd { font-size: 12px; font-weight: 600; fill: var(--muted); }
+  .iamfig .bx { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; }
+  .iamfig .bx.role { fill: var(--aws-soft); stroke: var(--aws); }
+  .iamfig .bx.gh { fill: var(--gh-soft); stroke: var(--gh); }
+  .iamfig .t { font-size: 13px; font-weight: 600; fill: var(--ink); }
+  .iamfig .s { font-size: 11px; fill: var(--muted); }
+  .iamfig .r { font-size: 11.5px; fill: var(--ink); }
+  .iamfig .plan { font-size: 11px; fill: var(--vpc); font-style: italic; }
+  .iamfig .ln { stroke: var(--line); stroke-width: 1.4; fill: none; }
+  .iamfig .lb { font-size: 11px; fill: var(--muted); }
+  .iamfig .ah { fill: var(--line); }
+  .card p { font-size: 0.9375rem; }
+  .card ol { padding-left: 1.2rem; display: grid; gap: 5px; font-size: 0.9375rem; margin: 0; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -180,6 +196,142 @@
     <h2 id="ref-title">Every service and how it's set up</h2>
     <p class="lede" style="margin-top:0">Values come from <code>infra/</code>, <code>Dockerfile</code> and <code>.github/workflows/</code> in the repo.</p>
     <div class="grid" id="cards"></div>
+  </section>
+
+  <section aria-labelledby="iam-title" id="iam">
+    <h2 id="iam-title">Who can do what: IAM</h2>
+    <p class="lede" style="margin-top:0">
+      Every AWS call is checked by <strong>IAM (Identity and Access Management)</strong>, and anything no policy
+      allows is denied. This project has <strong>no stored AWS keys anywhere</strong>: each part of the system
+      assumes a <strong>role</strong> and receives temporary keys that expire within an hour.
+    </p>
+
+    <div class="grid">
+      <div class="card"><h3>Principal</h3><p>Who is making the call: a person, a GitHub workflow, a running container or an AWS service acting for you.</p></div>
+      <div class="card"><h3>Role</h3><p>An identity with permissions but no password. Something trusted <em>assumes</em> it and gets temporary keys from STS (the Security Token Service).</p></div>
+      <div class="card"><h3>Trust policy</h3><p>Attached to the role: who may assume it. For the deploy role, only GitHub tokens for this repo's <code>demo</code> environment.</p></div>
+      <div class="card"><h3>Permission policy</h3><p>What the role may do: actions on resources, e.g. <code>secretsmanager:GetSecretValue</code> on 3 named secrets only. Deny is the default; an explicit deny always wins.</p></div>
+    </div>
+
+    <figure class="iamfig">
+      <svg viewBox="0 0 1000 372" role="img" aria-label="Four principals each assume one role. GitHub Actions assumes the deploy role with an OIDC token and can push images, run Terraform and update Cognito URLs. ECS starting the container assumes the execution role to pull the image, write logs and read three secrets. The app code assumes the task role, which allows only four Cognito admin actions on one pool, with Bedrock planned. ECS Express assumes the infrastructure role to manage the load balancer, certificate and scaling.">
+        <defs>
+          <marker id="iam-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L10 5 L0 10 z" class="ah" /></marker>
+        </defs>
+        <text x="10" y="20" class="hd">Who (principal)</text>
+        <text x="330" y="20" class="hd">Assumes this role (trust policy)</text>
+        <text x="690" y="20" class="hd">Temporary keys allow (permission policy)</text>
+
+        <!-- Row 1: GitHub -->
+        <rect x="10" y="34" width="220" height="70" rx="9" class="bx gh" />
+        <text x="22" y="58" class="t">GitHub Actions</text>
+        <text x="22" y="76" class="s">job in the demo environment,</text>
+        <text x="22" y="91" class="s">main branch only</text>
+        <path d="M230 69 H326" class="ln" marker-end="url(#iam-ah)" />
+        <text x="278" y="62" class="lb" text-anchor="middle">OIDC token</text>
+        <rect x="330" y="34" width="270" height="70" rx="9" class="bx role" />
+        <text x="342" y="58" class="t">advisoragent-github-deploy</text>
+        <text x="342" y="76" class="s">AdministratorAccess (to narrow)</text>
+        <text x="342" y="91" class="s">sessions at most 1 hour</text>
+        <path d="M600 69 H686" class="ln" marker-end="url(#iam-ah)" />
+        <rect x="690" y="34" width="300" height="70" rx="9" class="bx" />
+        <text x="702" y="56" class="r">Push images to ECR</text>
+        <text x="702" y="73" class="r">Run Terraform: RDS, ECS, IAM roles, logs</text>
+        <text x="702" y="90" class="r">Update Cognito sign-in URLs</text>
+
+        <!-- Row 2: execution -->
+        <rect x="10" y="120" width="220" height="70" rx="9" class="bx" />
+        <text x="22" y="144" class="t">ECS, starting the container</text>
+        <text x="22" y="162" class="s">before your code runs</text>
+        <path d="M230 155 H326" class="ln" marker-end="url(#iam-ah)" />
+        <text x="278" y="148" class="lb" text-anchor="middle">assumes</text>
+        <rect x="330" y="120" width="270" height="70" rx="9" class="bx role" />
+        <text x="342" y="144" class="t">advisoragent-execution</text>
+        <text x="342" y="162" class="s">AWS execution policy + read-app-secrets</text>
+        <path d="M600 155 H686" class="ln" marker-end="url(#iam-ah)" />
+        <rect x="690" y="120" width="300" height="70" rx="9" class="bx" />
+        <text x="702" y="142" class="r">Pull the image from ECR</text>
+        <text x="702" y="159" class="r">Write to CloudWatch Logs</text>
+        <text x="702" y="176" class="r">Read the 3 secrets, inject as env vars</text>
+
+        <!-- Row 3: task -->
+        <rect x="10" y="206" width="220" height="70" rx="9" class="bx" />
+        <text x="22" y="230" class="t">Your app code (boto3)</text>
+        <text x="22" y="248" class="s">while the app is running</text>
+        <path d="M230 241 H326" class="ln" marker-end="url(#iam-ah)" />
+        <text x="278" y="234" class="lb" text-anchor="middle">assumes</text>
+        <rect x="330" y="206" width="270" height="70" rx="9" class="bx role" />
+        <text x="342" y="230" class="t">advisoragent-task</text>
+        <text x="342" y="248" class="s">inline policy manage-demo-logins</text>
+        <path d="M600 241 H686" class="ln" marker-end="url(#iam-ah)" />
+        <rect x="690" y="206" width="300" height="70" rx="9" class="bx" />
+        <text x="702" y="228" class="r">Cognito: create user, set password,</text>
+        <text x="702" y="245" class="r">add to / remove from group (1 pool)</text>
+        <text x="702" y="263" class="plan">Planned: bedrock:InvokeModel (Claude)</text>
+
+        <!-- Row 4: infrastructure -->
+        <rect x="10" y="292" width="220" height="70" rx="9" class="bx" />
+        <text x="22" y="316" class="t">ECS Express</text>
+        <text x="22" y="334" class="s">managing the service for you</text>
+        <path d="M230 327 H326" class="ln" marker-end="url(#iam-ah)" />
+        <text x="278" y="320" class="lb" text-anchor="middle">assumes</text>
+        <rect x="330" y="292" width="270" height="70" rx="9" class="bx role" />
+        <text x="342" y="316" class="t">advisoragent-express-infrastructure</text>
+        <text x="342" y="334" class="s">AWS-managed Express policy</text>
+        <path d="M600 327 H686" class="ln" marker-end="url(#iam-ah)" />
+        <rect x="690" y="292" width="300" height="70" rx="9" class="bx" />
+        <text x="702" y="316" class="r">Create the load balancer and certificate</text>
+        <text x="702" y="333" class="r">Target groups, listeners, scaling</text>
+      </svg>
+      <figcaption>Four principals, four roles, each limited to its own job. Orange boxes are the roles; the right column is everything their temporary keys allow, and nothing else.</figcaption>
+    </figure>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">Role</th><th scope="col">Defined in</th><th scope="col">Policies</th><th scope="col">Cannot do (examples)</th></tr></thead>
+        <tbody>
+          <tr><td><code>advisoragent-github-deploy</code></td><td><code>infra/bootstrap/main.tf</code></td><td><code>AdministratorAccess</code></td><td>Be assumed from another repo, a fork, another branch or without the <code>demo</code> environment</td></tr>
+          <tr><td><code>advisoragent-execution</code></td><td><code>infra/app/main.tf</code></td><td><code>AmazonECSTaskExecutionRolePolicy</code> + inline <code>read-app-secrets</code></td><td>Read any secret other than the 3 named ones</td></tr>
+          <tr><td><code>advisoragent-task</code></td><td><code>infra/app/main.tf</code></td><td>Inline <code>manage-demo-logins</code></td><td>Read secrets, touch S3, RDS settings or ECR, delete Cognito users, use other pools</td></tr>
+          <tr><td><code>advisoragent-express-infrastructure</code></td><td><code>infra/app/main.tf</code></td><td><code>AmazonECSInfrastructureRoleforExpressGatewayServices</code></td><td>Anything outside the load balancing and scaling ECS Express needs</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>How a deploy gets keys</h3>
+        <ol>
+          <li>GitHub issues the job a signed token: repo <code>jchandel8/AdvisorAgent</code>, environment <code>demo</code>.</li>
+          <li>STS checks it against the deploy role's trust policy (audience <code>sts.amazonaws.com</code>, subject with the repo's permanent IDs).</li>
+          <li>It returns keys that expire within an hour. Nothing is left to leak afterwards.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>How the running app gets keys</h3>
+        <p>ECS gives the container the task role's temporary keys through a local credentials endpoint, and boto3 finds them automatically. They rotate on their own. The code never holds an AWS key, and the image contains none.</p>
+      </div>
+      <div class="card">
+        <h3>Two roles for one container</h3>
+        <p>The execution role is used only <em>before</em> your code starts: pulling the image and injecting secrets. The task role is what your code can do. So at runtime the app can't call Secrets Manager or ECR; it only has the values it was given at start.</p>
+      </div>
+      <div class="card">
+        <h3>IAM vs Cognito</h3>
+        <p><strong>IAM</strong>: which AWS identities (GitHub, ECS, the app) may use which AWS resources. <strong>Cognito</strong>: your app's users (advisors, clients, admins) signing in. Then the app's own <code>account_access</code> table decides which accounts each user sees. Three layers, three jobs.</p>
+      </div>
+      <div class="card">
+        <h3>Least privilege, honestly</h3>
+        <p>App roles are scoped to named resources (3 secret ARNs, one user pool ARN). The deploy role is the exception: Terraform creates many resource types, so it has admin rights, fenced by the trust policy and 1-hour sessions. Narrowing it is on the to-do list.</p>
+      </div>
+      <div class="card">
+        <h3>CloudTrail records every call</h3>
+        <p>Each IAM-checked call, allowed or refused, is logged with the principal that made it. That's how the first deploy's refused sign-in was diagnosed: the log showed exactly which subject GitHub sent.</p>
+      </div>
+      <div class="card">
+        <h3>Planned: Amazon Bedrock</h3>
+        <p>Today Claude is called on Anthropic's API with a key from Secrets Manager. With Bedrock, the task role gains <code>bedrock:InvokeModel</code> on the Claude models only and the API key secret goes away, so every credential in the system is a short-lived IAM one. Locally the app keeps using the API key; one setting picks the provider. Trade-off: Anthropic's server-side model fallback isn't available on Bedrock.</p>
+      </div>
+    </div>
   </section>
 
   <section aria-labelledby="stacks-title">
@@ -347,7 +499,7 @@
       '<strong>Execution role</strong>: pull from ECR, write logs, read the 3 secrets.',
       '<strong>Infrastructure role</strong>: lets ECS Express manage the load balancer, certificate and scaling (AWS-managed policy).',
       '<strong>Task role</strong>: the app itself, only Cognito admin calls on this pool.' ],
-      why: 'Least privilege per job: the running app can\'t read secrets it wasn\'t given or touch other AWS resources.' },
+      why: 'Least privilege per job: the running app can\'t read secrets it wasn\'t given or touch other AWS resources. <a href="#iam">Full IAM picture below.</a>' },
     { id: 's3', tag: 'aws', where: 'us-west-1', title: 'S3 state bucket', items: [
       '<code>advisoragent-tfstate-900896541106</code>, versioning on, AES-256 encryption, all public access blocked.',
       'Holds <code>app/terraform.tfstate</code>, Terraform\'s record of what the app stack created.',
@@ -399,7 +551,7 @@
       'Claude Haiku 5.5 for the scope check, Sonnet 5.5 for the agent.',
       'Key from Secrets Manager; reached over HTTPS through the task\'s public IP.',
       'Spend limit set on the key in the Anthropic Console; app limits of 10 a minute and 100 a day per advisor.' ],
-      why: 'Could move to Amazon Bedrock later to keep model calls inside the AWS account.' },
+      why: 'Planned: Amazon Bedrock, called with the task role through IAM, so the API key goes away. <a href="#iam">See IAM.</a>' },
   ];
 
   const svg = document.getElementById('map');
