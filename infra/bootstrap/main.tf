@@ -30,6 +30,12 @@ variable "github_repo" {
   default     = "jchandel8/AdvisorAgent"
 }
 
+variable "github_repo_with_ids" {
+  description = "owner@<owner id>/name@<repo id>, as GitHub puts it in the OIDC subject (seen in CloudTrail)"
+  type        = string
+  default     = "jchandel8@191924894/AdvisorAgent@1452303973"
+}
+
 data "aws_caller_identity" "current" {}
 
 resource "aws_s3_bucket" "tfstate" {
@@ -83,7 +89,12 @@ data "aws_iam_policy_document" "github_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:environment:demo"]
+      # GitHub now sends owner@<owner id>/repo@<repo id> (immutable IDs, so a renamed or re-created repo
+      # can't reuse this trust). The plain form is kept for accounts still on the older format.
+      values = [
+        "repo:${var.github_repo_with_ids}:environment:demo",
+        "repo:${var.github_repo}:environment:demo",
+      ]
     }
   }
 }
