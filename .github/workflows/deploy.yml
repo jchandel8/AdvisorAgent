@@ -48,5 +48,15 @@ jobs:
         run: |
           terraform init -input=false -backend-config="bucket=${{ vars.TFSTATE_BUCKET }}"
           terraform apply -input=false -auto-approve -var "image_tag=${GITHUB_SHA}"
+
+      # The URL is new after a teardown; Cognito only returns users to allow-listed URLs.
+      - name: Allow the app URL in Cognito sign-in
+        working-directory: infra/app
+        run: |
+          APP_URL="$(terraform output -raw APP_URL)"
+          python3 ../scripts/cognito_allow_url.py \
+            --pool "$(terraform output -raw COGNITO_USER_POOL_ID)" \
+            --client "$(terraform output -raw COGNITO_CLIENT_ID)" \
+            --url "$APP_URL"
           echo "### App URL" >> "$GITHUB_STEP_SUMMARY"
-          terraform output -raw APP_URL >> "$GITHUB_STEP_SUMMARY"
+          echo "$APP_URL" >> "$GITHUB_STEP_SUMMARY"

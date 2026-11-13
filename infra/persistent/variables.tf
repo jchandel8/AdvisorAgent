@@ -6,8 +6,7 @@ variable "region" {
 variable "app_urls" {
   description = "Origins where the web app runs. Sign-in returns to <url>/auth/callback; sign-out to <url>/login."
   type        = list(string)
-  default = [
-    "http://localhost:4200",
-    "https://ad-4e693211c8514b9389b0a39a34b07394.ecs.us-west-1.on.aws", # AWS demo (ECS Express); changes if the service is re-created
-  ]
+  # Only used when the Cognito client is first created. After that the Deploy workflow adds the current AWS
+  # URL itself (cognito.tf ignores later changes to the lists), because that URL changes after a teardown.
+  default = ["http://localhost:4200"]
 }

@@ -170,7 +170,13 @@ Do these at https://github.com/jchandel8/AdvisorAgent, then **Settings**.
     It should return a small JSON with `"status": "ok"`. The web page loads at this point, but **sign-in
     won't work until phase 8**.
 
-## Phase 8: Let Cognito send people back to the AWS URL (5 minutes, [AWS change])
+## Phase 8: Let Cognito send people back to the AWS URL (automatic now)
+
+**Automatic since 2026-11-13.** The Deploy workflow's step "Allow the app URL in Cognito sign-in" runs
+`infra/scripts/cognito_allow_url.py`. It adds the new App URL, keeps localhost, and removes old AWS URLs.
+Terraform ignores these lists (`lifecycle.ignore_changes` in `infra/persistent/cognito.tf`), so it doesn't
+undo the workflow's change. The manual steps below are only needed if that workflow step fails.
+
 
 Cognito only returns users to web addresses on its allowed list, which today contains only `localhost`.
 
@@ -220,7 +226,8 @@ The demo logins are created automatically each time the AWS app starts. Use the 
     - This deletes the database, the app and the load balancer.
     - Cognito, ECR and the secrets stay.
 35. **Bring it back:** run **Deploy demo** again (phase 7). The data is re-seeded and the logins re-created.
-    - The App URL may change after a teardown. If it does, repeat phase 8 with the new URL.
+    - The App URL changes after a teardown. The Deploy workflow updates Cognito by itself; use the new URL
+      from the run's Summary page.
 
 ## Local setup (no AWS involved)
 

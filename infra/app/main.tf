@@ -255,6 +255,14 @@ resource "aws_ecs_express_gateway_service" "app" {
   ]
 }
 
+output "COGNITO_USER_POOL_ID" {
+  value = var.cognito_user_pool_id
+}
+
+output "COGNITO_CLIENT_ID" {
+  value = var.cognito_client_id
+}
+
 output "APP_URL" {
   description = "Open this. Then add it to infra/persistent app_urls so Cognito sign-in can return here."
   value       = try(aws_ecs_express_gateway_service.app.ingress_paths[0].endpoint, null) # already includes https://
