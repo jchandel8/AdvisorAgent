@@ -242,6 +242,9 @@ resource "aws_ecs_express_gateway_service" "app" {
   scaling_target {
     min_task_count = 1
     max_task_count = 1
+    # AWS fills these defaults in; leaving them unset makes provider 6.73 fail with "inconsistent result after apply".
+    auto_scaling_metric       = "AVERAGE_CPU"
+    auto_scaling_target_value = 60
   }
 
   # Avoid a stuck delete: roles must outlive the service.
@@ -254,5 +257,5 @@ resource "aws_ecs_express_gateway_service" "app" {
 
 output "APP_URL" {
   description = "Open this. Then add it to infra/persistent app_urls so Cognito sign-in can return here."
-  value       = try("https://${aws_ecs_express_gateway_service.app.ingress_paths[0].endpoint}", null)
+  value       = try(aws_ecs_express_gateway_service.app.ingress_paths[0].endpoint, null) # already includes https://
 }
