@@ -184,7 +184,8 @@ resource "aws_ecs_express_gateway_service" "app" {
     container_port = 8000
 
     aws_logs_configuration {
-      log_group = aws_cloudwatch_log_group.app.name
+      log_group         = aws_cloudwatch_log_group.app.name
+      log_stream_prefix = "app" # required by the ECS API, although the provider marks it optional
     }
 
     environment {

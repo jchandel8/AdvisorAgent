@@ -243,7 +243,7 @@ The demo logins are created automatically each time the AWS app starts. Use the 
 
 | What you see | Likely cause | Fix |
 |---|---|---|
-| Deploy fails at "configure-aws-credentials" with `Not authorized to perform sts:AssumeRoleWithWebIdentity` | The `demo` environment is missing, misnamed, or not limited to `main`; or a repository variable is wrong | Re-check steps 20 and 22 |
+| Deploy fails at "configure-aws-credentials" with `Not authorized to perform sts:AssumeRoleWithWebIdentity` | The identity GitHub sends doesn't match the role's trust rule. GitHub now sends `repo:owner@<id>/name@<id>:environment:demo` (with permanent IDs). Or the `demo` environment or a repository variable is wrong | See the exact identity in CloudTrail: `aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,AttributeValue=AssumeRoleWithWebIdentity --max-results 3` (look at `userName`). Set `github_repo_with_ids` in `infra/bootstrap/main.tf` to match, then re-apply bootstrap. Re-check steps 20 and 22 |
 | Deploy fails at "Apply infra/app" with `ResourceNotFoundException` for a secret or ECR | Phase 4 not applied | Do phase 4, then deploy again |
 | App never becomes healthy; logs mention timeouts reaching ECR, Secrets Manager or `api.anthropic.com` | The app has no internet path (the one untested part of this design) | Send me the log lines; the fix is a network setting in `infra/app` |
 | Logs say `DEMO_PASSWORD` is too short, or Cognito rejects the password | The password breaks the rules in step 9 | Put a valid value (step 18), then redeploy |
