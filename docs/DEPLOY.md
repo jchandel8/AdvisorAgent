@@ -250,6 +250,7 @@ The demo logins are created automatically each time the AWS app starts. Use the 
 | Sign-in page shows `redirect_mismatch` | Phase 8 not done, or the URL differs (http vs https, trailing slash) | Redo phase 8 with the exact URL |
 | "This login isn't set up for AdvisorAgent" | That username has no user in the app's database | Use a username from the phase 9 table |
 | Assistant says it is unavailable | Anthropic key missing or wrong, or out of credit | Check step 17 and the Anthropic Console |
+| Deploy ends with `Provider produced inconsistent result after apply` on the Express service | Provider bug when AWS fills defaults (fixed in `infra/app/main.tf` by setting them). Terraform marks the service tainted, so the next deploy would re-create it with a new URL | `infra/tf.sh app untaint aws_ecs_express_gateway_service.app` (after `init -backend-config=bucket=...`), then deploy again |
 | Unexpected AWS bill email | Stack left running | Run Tear down (step 34) |
 
 ## What Claude changed before this runbook

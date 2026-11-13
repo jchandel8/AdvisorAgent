@@ -10,7 +10,7 @@ Handoff notes so work can resume in any session. Update at the end of every step
 | 2. FastAPI endpoints + Angular portals (advisor, client) | **Done** (2026-11-12): 144 backend + 7 frontend tests |
 | 3. Cognito login, Playwright E2E | **Done** (2026-11-12). Cognito pool `us-west-1_yZ66inLgw` created with the owner's permission. Owner still to run `wealth.ops.demo_logins --apply` |
 | 4. Admin portal, audit log, demo page, reset script | **Done** (2026-11-12): 227 backend, 9 frontend, 6 browser tests |
-| 5. AWS deploy (ECS Express, RDS, Secrets Manager), IaC, CI | **In progress**: bootstrap (7) and persistent additions (4: ECR + 2 empty secrets) applied with the owner's yes. Next: owner fills secrets, GitHub `demo` environment + variables, runs Deploy (docs/DEPLOY.md phase 5 onward) |
+| 5. AWS deploy (ECS Express, RDS, Secrets Manager), IaC, CI | **Deployed** (2026-11-13): https://ad-4e693211c8514b9389b0a39a34b07394.ecs.us-west-1.on.aws (Cognito callbacks added). Fixes found on the way: OIDC subject now has owner/repo IDs; Express needs `log_stream_prefix`; set `auto_scaling_metric`/`target_value` (provider 6.73 bug) and untainted the service. Default VPC egress works (no NAT). Next: owner tests phase 9 |
 | 6. MCP server, document search, guardrails, evals, tracing, rate limits | Not started |
 
 ## How to run (local)
