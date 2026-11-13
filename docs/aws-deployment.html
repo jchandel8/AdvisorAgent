@@ -1,0 +1,539 @@
+<title>AdvisorAgent on AWS</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: one wide service map (GitHub across the top, the AWS account below with the default VPC inside),
+     five playable journeys under it, then a reference card per service. Tokens follow the app's design system. */
+  :root {
+    --paper: #f6f7f5;
+    --surface: #ffffff;
+    --sunk: #eef1ef;
+    --ink: #17201d;
+    --muted: #55625d;
+    --rule: #dce1de;
+    --line: #9aa6a1;
+    --aws: #a35200;
+    --aws-soft: #fbf1e6;
+    --gh: #2e3a8c;
+    --gh-soft: #eceefb;
+    --vpc: #0e5a4a;
+    --ai: #8a5a00;
+    --focus: #1d5fd1;
+    --sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #111816; --surface: #18211e; --sunk: #141c19; --ink: #e6ece9; --muted: #a3b0ab; --rule: #2c3833;
+      --line: #5b6a64; --aws: #f0a95a; --aws-soft: #2a2116; --gh: #a9b3f5; --gh-soft: #1f2340; --vpc: #5fbfa6;
+      --ai: #e8b45a; --focus: #7aa7ff; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #111816; --surface: #18211e; --sunk: #141c19; --ink: #e6ece9; --muted: #a3b0ab; --rule: #2c3833;
+    --line: #5b6a64; --aws: #f0a95a; --aws-soft: #2a2116; --gh: #a9b3f5; --gh-soft: #1f2340; --vpc: #5fbfa6;
+    --ai: #e8b45a; --focus: #7aa7ff; color-scheme: dark;
+  }
+
+  body { background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.55; }
+  .wrap {
+    max-width: 1240px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 40px 72px;
+    display: grid; gap: 44px;
+  }
+  h1, h2, h3 { line-height: 1.2; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(1.75rem, 3.5vw, 2.5rem); font-weight: 600; }
+  h2 { font-size: 1.375rem; font-weight: 600; }
+  h3 { font-size: 1.0625rem; font-weight: 600; }
+  p, ul { margin: 0; }
+  .lede { max-width: 72ch; color: var(--muted); margin-top: 12px; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+  code { font-family: var(--mono); font-size: 0.82em; background: var(--sunk); padding: 0.06em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+  section { display: grid; gap: 16px; min-width: 0; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tab, .btn {
+    font: inherit; font-size: 0.9375rem; min-height: 44px; padding: 0 16px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .tab:hover, .btn:hover { background: var(--sunk); }
+  .tab[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); font-weight: 600; }
+  .tab .n { font-variant-numeric: tabular-nums; opacity: .7; }
+  .btns { display: flex; gap: 8px; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .canvas { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; overflow-x: auto; margin: 0; }
+  .canvas svg { display: block; width: 100%; min-width: 900px; height: auto; }
+  svg text { font-family: var(--sans); fill: var(--ink); }
+  svg .t { font-size: 13.5px; font-weight: 600; }
+  svg .s { font-size: 11px; fill: var(--muted); }
+  svg .zl { font-size: 12px; font-weight: 700; }
+  svg .z-gh { fill: var(--gh-soft); stroke: var(--gh); stroke-width: 1.25; }
+  svg .z-aws { fill: var(--aws-soft); stroke: var(--aws); stroke-width: 1.25; }
+  svg .z-vpc { fill: none; stroke: var(--vpc); stroke-width: 1.25; stroke-dasharray: 6 5; }
+  svg .node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; transition: stroke .2s, stroke-width .2s; }
+  svg .node { cursor: pointer; }
+  svg .node.on rect { stroke: var(--packet, var(--ink)); stroke-width: 2.75; }
+  svg .node.kept rect { stroke: var(--vpc); stroke-width: 2.25; stroke-dasharray: 5 3; }
+  svg .node.gone { opacity: .35; }
+  svg .edge { fill: none; stroke: var(--line); stroke-width: 1.4; opacity: .55; }
+  svg .edge.on { stroke: var(--packet, var(--ink)); stroke-width: 2.5; opacity: 1; }
+  svg .arrow { fill: var(--line); }
+  svg .packet { fill: var(--packet, var(--ink)); }
+  svg .halo { fill: var(--packet, var(--ink)); opacity: .22; }
+  svg .chip rect { fill: var(--ink); }
+  svg .chip text { fill: var(--paper); font-size: 11px; font-weight: 600; }
+
+  .now { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 20px; }
+  .now .num { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 2ch; color: var(--packet, var(--ink)); }
+  .steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; counter-reset: s; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 2.25rem 1fr; gap: 8px; padding: 8px 12px;
+    border-radius: 8px; color: var(--muted); cursor: pointer; }
+  .steps li::before { content: counter(s); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .steps li:hover { background: var(--sunk); }
+  .steps li.on { background: var(--sunk); color: var(--ink); }
+  .steps li.on::before { color: var(--packet, var(--ink)); }
+  .steps li.done { color: var(--ink); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; color: var(--muted); font-size: 0.875rem; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .sw { width: 22px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px;
+    display: grid; gap: 8px; align-content: start; min-width: 0; scroll-margin-top: 16px; transition: border-color .3s, box-shadow .3s; }
+  .card.flash { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent); }
+  .card header { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .card .where { font-size: 0.8125rem; color: var(--muted); }
+  .card ul { padding-left: 1.1rem; display: grid; gap: 5px; font-size: 0.9375rem; }
+  .card .why { font-size: 0.875rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 8px; }
+  .tag-aws { color: var(--aws); } .tag-gh { color: var(--gh); } .tag-vpc { color: var(--vpc); } .tag-ext { color: var(--ai); }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
+  th, td { text-align: left; padding: 10px 14px; border-top: 1px solid var(--rule); vertical-align: top; }
+  thead th { border-top: 0; color: var(--muted); font-weight: 500; font-size: 0.875rem; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>AdvisorAgent on AWS</h1>
+    <p class="lede">
+      How the code becomes a running app: <strong>GitHub Actions</strong> builds one Docker image and runs
+      <strong>Terraform</strong>, which creates the database and an <strong>ECS Express</strong> service in
+      <strong>us-west-1</strong>. Pick a journey below and watch it move through each AWS service. Click any box to
+      jump to its exact settings.
+    </p>
+  </header>
+
+  <section aria-labelledby="map-title">
+    <h2 id="map-title">Follow the deployment</h2>
+    <div class="controls">
+      <div class="tabs" role="group" aria-label="Choose a journey">
+        <button class="tab" type="button" data-scenario="build"><span class="n">1</span>Code to image</button>
+        <button class="tab" type="button" data-scenario="apply"><span class="n">2</span>Terraform builds AWS</button>
+        <button class="tab" type="button" data-scenario="boot"><span class="n">3</span>Container starts</button>
+        <button class="tab" type="button" data-scenario="request"><span class="n">4</span>A user signs in and asks</button>
+        <button class="tab" type="button" data-scenario="teardown"><span class="n">5</span>Tear down</button>
+      </div>
+      <div class="btns">
+        <button class="btn" type="button" id="play">Pause</button>
+        <button class="btn" type="button" id="next">Next step</button>
+      </div>
+    </div>
+
+    <figure class="canvas">
+      <svg viewBox="0 0 1200 720" id="map" role="img"
+        aria-label="GitHub (your laptop, CI and the deploy runner) sits above the AWS account in us-west-1. The runner signs in to AWS through IAM and STS with OIDC, pushes the image to ECR and keeps Terraform state in S3. Inside the default VPC, a load balancer created by ECS Express sends HTTPS traffic to one Fargate container, which reads secrets from Secrets Manager, talks to RDS PostgreSQL, writes logs to CloudWatch, manages logins in Cognito and calls the Anthropic API over the internet.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" class="arrow" />
+          </marker>
+        </defs>
+        <g id="zones"></g>
+        <g id="edges"></g>
+        <g id="nodes"></g>
+        <g id="chip" class="chip" style="visibility:hidden" aria-hidden="true"><rect rx="5" height="20" /><text y="14"></text></g>
+        <g id="packet" style="visibility:hidden" aria-hidden="true"><circle class="halo" r="11" /><circle class="packet" r="5.5" /></g>
+      </svg>
+    </figure>
+
+    <div class="now" aria-live="polite"><span class="num" id="now-num">1</span><p id="now-text"></p></div>
+    <ol class="steps" id="steps"></ol>
+    <div class="legend" aria-label="Legend">
+      <span><span class="sw" style="background: var(--gh-soft); border: 1.25px solid var(--gh)"></span>GitHub</span>
+      <span><span class="sw" style="background: var(--aws-soft); border: 1.25px solid var(--aws)"></span>AWS account</span>
+      <span><span class="sw" style="border: 1.25px dashed var(--vpc)"></span>Default VPC (network)</span>
+      <span><span class="sw" style="border: 2px dashed var(--vpc)"></span>Kept after teardown</span>
+    </div>
+  </section>
+
+  <section aria-labelledby="ref-title">
+    <h2 id="ref-title">Every service and how it's set up</h2>
+    <p class="lede" style="margin-top:0">Values come from <code>infra/</code>, <code>Dockerfile</code> and <code>.github/workflows/</code> in the repo.</p>
+    <div class="grid" id="cards"></div>
+  </section>
+
+  <section aria-labelledby="stacks-title">
+    <h2 id="stacks-title">Three Terraform stacks, three lifetimes</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">Stack</th><th scope="col">Creates</th><th scope="col">State kept in</th><th scope="col">Lifetime</th></tr></thead>
+        <tbody>
+          <tr><td><code>infra/bootstrap</code></td><td>S3 state bucket, GitHub OIDC provider, deploy role</td><td>Your laptop (local file)</td><td>Once</td></tr>
+          <tr><td><code>infra/persistent</code></td><td>Cognito pool, client, domain, groups; ECR; 2 secrets</td><td>Your laptop (local file)</td><td>Kept forever</td></tr>
+          <tr><td><code>infra/app</code></td><td>RDS, security group, IAM roles, log group, ECS cluster, Express service</td><td>S3 <code>app/terraform.tfstate</code></td><td>Deploy creates, Teardown destroys</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="cost-title">
+    <h2 id="cost-title">What it costs</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">State</th><th scope="col">Main costs</th><th scope="col">About</th></tr></thead>
+        <tbody>
+          <tr><td>Running</td><td>Load balancer, Fargate task (0.5 vCPU, 1 GB), RDS db.t4g.micro, public IPv4 addresses, plus Claude usage</td><td class="num">$60–90 / month</td></tr>
+          <tr><td>Torn down</td><td>2 secrets ($0.40 each), ECR images, S3 state, Cognito (free at this size)</td><td class="num">≈ $1 / month</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="lessons-title">
+    <h2 id="lessons-title">What the first deploy taught us</h2>
+    <div class="grid">
+      <div class="card"><h3>GitHub's identity format</h3><p>GitHub sends <code>repo:jchandel8@191924894/AdvisorAgent@1452303973:environment:demo</code>, with permanent IDs. The role trusted the name only, so AWS refused. Found by reading the refused sign-in in CloudTrail.</p></div>
+      <div class="card"><h3>A required log setting</h3><p>ECS rejected the service without <code>log_stream_prefix</code>, although the Terraform provider marks it optional. <code>terraform validate</code> can't catch API rules like this.</p></div>
+      <div class="card"><h3>A provider bug that taints</h3><p>AWS filled in autoscaling defaults, the provider called it an error and marked the service tainted. Setting the values explicitly and running <code>terraform untaint</code> kept the healthy service and its URL.</p></div>
+      <div class="card"><h3>A URL that moves</h3><p>Each re-created Express service gets a new URL. The deploy now updates Cognito's allow-list itself, reading and re-sending the full client settings, because the update call resets anything not sent.</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const ZONES = [
+    { x: 8, y: 8, w: 680, h: 112, cls: 'z-gh', label: 'GitHub · jchandel8/AdvisorAgent', lx: 22, ly: 26, color: 'var(--gh)' },
+    { x: 230, y: 150, w: 770, h: 562, cls: 'z-aws', label: 'AWS account 900896541106 · us-west-1', lx: 246, ly: 170, color: 'var(--aws)' },
+    { x: 250, y: 290, w: 730, h: 250, cls: 'z-vpc', label: 'Default VPC · public subnets, one per zone · no NAT gateway', lx: 266, ly: 309, color: 'var(--vpc)' },
+  ];
+  const NODES = {
+    dev:      { x: 30,  y: 36,  w: 160, h: 70,  t: 'Your laptop', s: ['git push to main', 'Terraform via infra/tf.sh'] },
+    ci:       { x: 210, y: 36,  w: 170, h: 70,  t: 'CI workflow', s: ['every push and PR', 'lint, 230 tests, build'] },
+    runner:   { x: 400, y: 36,  w: 270, h: 70,  t: 'Deploy / Tear down runner', s: ['ubuntu-latest · environment demo', 'docker build · terraform · aws cli'] },
+    iam:      { x: 250, y: 180, w: 160, h: 76,  t: 'IAM + STS', s: ['GitHub OIDC provider', 'deploy role + 3 app roles'] },
+    s3:       { x: 426, y: 180, w: 160, h: 76,  t: 'S3', s: ['Terraform state', 'versioned, encrypted'] },
+    ecr:      { x: 602, y: 180, w: 160, h: 76,  t: 'ECR', s: ['image registry', 'tag = git commit SHA'] },
+    secrets:  { x: 778, y: 180, w: 200, h: 76,  t: 'Secrets Manager', s: ['Anthropic key, demo password', 'DB password (RDS-managed)'] },
+    alb:      { x: 270, y: 370, w: 170, h: 100, t: 'Load balancer', s: ['created by ECS Express', 'HTTPS on *.on.aws', 'forwards to :8000'] },
+    task:     { x: 480, y: 320, w: 250, h: 200, t: 'Fargate task: one container', s: ['0.5 vCPU · 1 GB · x86_64', 'start.sh runs:', '1  migrate the database', '2  seed data if empty', '3  create demo logins', '4  uvicorn: API + agent + web'] },
+    rds:      { x: 776, y: 350, w: 190, h: 120, t: 'RDS PostgreSQL 17', s: ['db.t4g.micro · 20 GB gp3', 'encrypted · not public', '5432 from the VPC only'] },
+    cognito:  { x: 250, y: 590, w: 190, h: 100, t: 'Cognito', s: ['hosted sign-in page', 'advisors, clients, admins', 'allow-list: localhost + app'] },
+    ecs:      { x: 480, y: 590, w: 250, h: 100, t: 'ECS Express service', s: ['cluster advisoragent', '1 task (min = max = 1)', 'health check /api/health'] },
+    logs:     { x: 776, y: 590, w: 204, h: 100, t: 'CloudWatch Logs', s: ['/advisoragent/app', 'stream prefix app/', 'kept 14 days'] },
+    anthropic:{ x: 1020, y: 370, w: 165, h: 100, t: 'Anthropic API', s: ['Haiku 5.5: scope check', 'Sonnet 5.5: agent', 'reached over the internet'] },
+    browser:  { x: 30,  y: 380, w: 170, h: 80,  t: 'Browsers', s: ['advisor, client and', 'admin portals'] },
+  };
+
+  // side: t/b/l/r with an optional fraction along that side (default middle).
+  function anchor(id, spec) {
+    const n = NODES[id]; const [side, f] = spec.split(':'); const k = f === undefined ? 0.5 : +f;
+    if (side === 't') return { x: n.x + n.w * k, y: n.y, nx: 0, ny: -1 };
+    if (side === 'b') return { x: n.x + n.w * k, y: n.y + n.h, nx: 0, ny: 1 };
+    if (side === 'l') return { x: n.x, y: n.y + n.h * k, nx: -1, ny: 0 };
+    return { x: n.x + n.w, y: n.y + n.h * k, nx: 1, ny: 0 };
+  }
+  function curve(a, b) {
+    const d = Math.hypot(b.x - a.x, b.y - a.y), k = Math.min(70, d / 2);
+    return `M${a.x} ${a.y} C${a.x + a.nx * k} ${a.y + a.ny * k} ${b.x + b.nx * k} ${b.y + b.ny * k} ${b.x} ${b.y}`;
+  }
+  const E = (from, fs, to, ts, label) => ({ d: curve(anchor(from, fs), anchor(to, ts)), label });
+  const EDGES = {
+    push:     E('dev', 'r', 'ci', 'l', 'git push'),
+    run:      { d: 'M110 106 V134 H390 V71 H400', label: 'Run workflow' },
+    oidc:     E('runner', 'b:0.12', 'iam', 't', 'OIDC token → 1-hour keys'),
+    state:    E('runner', 'b:0.38', 's3', 't', 'read / write state'),
+    image:    E('runner', 'b:0.75', 'ecr', 't', 'docker push :<sha>'),
+    tf:       { d: 'M670 71 H1006 V704 H605 V690', label: 'terraform apply / destroy' },
+    allow:    { d: 'M413 106 V128 H222 V640 H250', label: 'add app URL to allow-list' },
+    mkalb:    E('ecs', 't:0.1', 'alb', 'b', 'creates'),
+    mktask:   E('ecs', 't:0.5', 'task', 'b:0.5', 'starts task'),
+    pull:     E('task', 't:0.7', 'ecr', 'b', 'pull image'),
+    inject:   E('secrets', 'b:0.3', 'task', 'r:0.15', 'inject secrets'),
+    rdssecret:E('rds', 't:0.6', 'secrets', 'b:0.75', 'stores DB password'),
+    sql:      E('task', 'r:0.6', 'rds', 'l', 'SQL over TLS'),
+    tologs:   E('task', 'b:0.85', 'logs', 't:0.3', 'stdout'),
+    logins:   E('task', 'b:0.15', 'cognito', 't:0.6', 'AdminCreateUser'),
+    health:   E('alb', 'r', 'task', 'l:0.5', 'HTTP :8000'),
+    https:    E('browser', 'r', 'alb', 'l', 'HTTPS'),
+    signin:   E('browser', 'b', 'cognito', 'l', 'sign in (PKCE)'),
+    claude:   E('task', 't:0.92', 'anthropic', 't', 'HTTPS to Claude'),
+  };
+
+  const SCENARIOS = {
+    build: { color: 'var(--gh)', steps: [
+      { n: ['dev'], e: [['push']], text: 'You push to <code>main</code>. Every push and pull request starts the <strong>CI</strong> workflow.' },
+      { n: ['ci'], e: [], text: 'CI runs on a GitHub-hosted Ubuntu machine: <code>ruff</code> lint, 230 backend tests against a real Postgres service container, then the Angular tests and production build. Nothing touches AWS.' },
+      { n: ['dev', 'runner'], e: [['run']], text: 'You click <strong>Run workflow</strong> on <em>Deploy demo</em>. The job runs in the GitHub environment <code>demo</code>, which only allows <code>main</code>. A concurrency group stops a deploy and a teardown overlapping.' },
+      { n: ['iam'], e: [['oidc'], ['oidc', true]], text: 'GitHub hands the job a signed OIDC token. AWS STS checks it against the trust rule (audience <code>sts.amazonaws.com</code>, subject <code>…AdvisorAgent@1452303973:environment:demo</code>) and returns keys for <code>advisoragent-github-deploy</code> that expire within an hour. No AWS keys are stored in GitHub.' },
+      { n: ['runner'], e: [], text: '<code>docker build</code>, stage 1: <code>node:22-alpine</code> runs <code>npm ci</code> and <code>ng build</code>. Stage 2: <code>python:3.12-slim</code> installs locked dependencies with <code>uv sync --frozen</code>, copies in the built Angular files, and runs as a non-root user on port 8000. One image serves the API, the agent and the website.' },
+      { n: ['ecr'], e: [['image']], text: 'The image is pushed to ECR tagged with the git commit SHA, so every deploy is traceable to a commit. ECR scans it for known vulnerabilities and keeps the 10 newest images.' },
+    ]},
+    apply: { color: 'var(--aws)', steps: [
+      { n: ['s3'], e: [['state'], ['state', true]], text: '<code>terraform init</code> connects to the state file <code>app/terraform.tfstate</code> in S3 and takes a lock (S3-native lock file), so two runs can never change AWS at once.' },
+      { n: ['rds', 'secrets'], e: [['tf'], ['rdssecret']], text: 'Terraform creates <strong>RDS PostgreSQL 17</strong> (about 10 minutes). RDS generates the master password itself and stores it in Secrets Manager, so the password never appears in code or Terraform.' },
+      { n: ['iam', 'logs'], e: [['tf']], text: 'It creates three IAM roles (execution, infrastructure, task), the log group <code>/advisoragent/app</code>, the ECS cluster, and the security group that allows port 5432 only from inside the VPC.' },
+      { n: ['ecs'], e: [['tf']], text: 'It creates the <strong>ECS Express</strong> service: image, port 8000, health check path, 0.5 vCPU and 1 GB, one task.' },
+      { n: ['alb'], e: [['mkalb']], text: 'Express Mode, using the infrastructure role, builds the load balancer, the HTTPS certificate and a public URL like <code>https://ad-…ecs.us-west-1.on.aws</code>.' },
+      { n: ['task'], e: [['mktask']], text: 'It starts one Fargate task in a public subnet of the default VPC. Terraform waits until the service is steady (task healthy behind the load balancer).' },
+      { n: ['cognito'], e: [['allow']], text: 'The last workflow step runs <code>cognito_allow_url.py</code>: it adds the new URL to Cognito\'s allow-list, keeps localhost, removes old AWS URLs, and prints the App URL on the run\'s Summary page.' },
+    ]},
+    boot: { color: 'var(--vpc)', steps: [
+      { n: ['task', 'ecr'], e: [['pull']], text: 'Fargate pulls the image from ECR using the <strong>execution role</strong>. The task has a public IP, which is how it reaches AWS services and the internet without a NAT gateway.' },
+      { n: ['secrets'], e: [['inject']], text: 'Before the container starts, the execution role reads three secrets and injects them as environment variables: <code>DB_PASSWORD</code> (from the RDS-managed secret), <code>ANTHROPIC_API_KEY</code>, <code>DEMO_PASSWORD</code>.' },
+      { n: ['rds'], e: [['sql'], ['sql', true]], text: '<code>start.sh</code> step 1: <code>python -m wealth.migrate</code> applies the 5 SQL migrations. The connection string is built from <code>DB_HOST</code>, <code>DB_USER</code> and <code>DB_PASSWORD</code> with <code>sslmode=require</code>.' },
+      { n: ['rds'], e: [['sql']], text: 'Step 2: <code>datagen --if-empty</code> loads the seeded demo data (about 16 seconds) only when the database is new, so a restart never wipes it.' },
+      { n: ['cognito'], e: [['logins']], text: 'Step 3: <code>demo_logins --apply</code> creates or updates the 6 demo logins and their groups. The <strong>task role</strong> allows only AdminCreateUser, AdminSetUserPassword and the group calls, on this one pool.' },
+      { n: ['logs'], e: [['tologs']], text: 'Everything the container prints goes to CloudWatch Logs, stream prefix <code>app/</code>, kept 14 days. This is where you saw "Loaded database" and "created advisor".' },
+      { n: ['alb', 'task'], e: [['health'], ['health', true]], text: 'Step 4: uvicorn starts. The load balancer calls <code>/api/health</code>, which runs <code>SELECT 1</code>. Once it returns ok, the task is healthy and receives traffic.' },
+    ]},
+    request: { color: 'var(--ai)', steps: [
+      { n: ['browser', 'cognito'], e: [['signin']], text: 'Anthony opens the App URL and selects Sign in. The Angular app sends him to Cognito\'s hosted page using the authorization code flow with PKCE. His password goes to Cognito, never to the app.' },
+      { n: ['browser'], e: [['signin', true]], text: 'Cognito redirects back to <code>/auth/callback</code> (allowed only because the URL is on the allow-list) with a code, which the app swaps for a signed access token carrying his group, <code>advisors</code>.' },
+      { n: ['alb'], e: [['https']], text: 'Every API call goes over HTTPS with the token. TLS ends at the load balancer.' },
+      { n: ['task'], e: [['health']], text: 'The load balancer forwards to port 8000. FastAPI verifies the token itself: RS256 signature with Cognito\'s public keys, issuer, expiry, token use, app client ID, exactly one group.' },
+      { n: ['rds'], e: [['sql'], ['sql', true]], text: 'The access layer reads only accounts with an <code>account_access</code> row for Anthony, inside a read-only transaction.' },
+      { n: ['anthropic'], e: [['claude'], ['claude', true]], text: 'For an assistant question, the container calls Claude over the internet: Haiku 5.5 checks scope, then Sonnet 5.5 plans tool calls. The tools run back in the container against RDS.' },
+      { n: ['browser'], e: [['health', true], ['https', true]], text: 'The answer goes back through the load balancer to the browser.' },
+    ]},
+    teardown: { color: 'var(--focus)', steps: [
+      { n: ['dev', 'runner'], e: [['run']], text: 'You run <strong>Tear down demo</strong> and type <code>DESTROY</code>. Any other text and the job skips.' },
+      { n: ['iam'], e: [['oidc'], ['oidc', true]], text: 'Same keyless sign-in through OIDC and STS.' },
+      { n: ['s3'], e: [['state'], ['state', true]], text: 'Terraform reads the state from S3 to know exactly what it created, so it deletes only those resources.' },
+      { n: ['ecs', 'alb', 'task'], e: [['tf']], text: '<code>terraform destroy</code> removes the Express service, which takes down the load balancer, certificate and task.', gone: [] },
+      { n: ['rds'], e: [['tf']], text: 'It deletes the database without a final snapshot (the next deploy re-seeds), which also deletes its managed password secret.' },
+      { n: [], e: [], text: 'Then the IAM roles, log group, cluster and security group. Left (dashed green): S3 state, ECR images, the two secrets, Cognito and the deploy role, about $1 a month.',
+        kept: ['s3', 'ecr', 'secrets', 'cognito', 'iam'], gone: ['ecs', 'alb', 'task', 'rds', 'logs'] },
+    ]},
+  };
+
+  const CARDS = [
+    { id: 'runner', tag: 'gh', where: 'GitHub', title: 'GitHub Actions', items: [
+      '<code>ci.yml</code>: every push and PR. Ruff lint, pytest with a Postgres 17 service container, frontend tests and build.',
+      '<code>deploy.yml</code>: manual button. OIDC sign-in, build and push image, <code>terraform apply</code>, Cognito allow-list, prints the URL.',
+      '<code>teardown.yml</code>: manual button, requires typing <code>DESTROY</code>, runs <code>terraform destroy</code> on <code>infra/app</code> only.',
+      'Environment <code>demo</code> limited to <code>main</code>; repository variables <code>AWS_DEPLOY_ROLE_ARN</code> and <code>TFSTATE_BUCKET</code>; no stored AWS keys.',
+      'Concurrency group <code>aws-demo</code>: deploy and teardown never run at the same time.' ],
+      why: 'Every AWS change goes through a reviewed workflow on main, not someone\'s laptop.' },
+    { id: 'dev', tag: 'gh', where: 'Your laptop', title: 'Docker image', items: [
+      'Multi-stage <code>Dockerfile</code>. Stage 1 <code>node:22-alpine</code> builds Angular; stage 2 <code>python:3.12-slim</code> with uv, locked dependencies, built web files in <code>/app/static</code>.',
+      'Runs as non-root user <code>app</code>, exposes 8000, starts <code>scripts/start.sh</code>.',
+      'Local Terraform for the bootstrap and persistent stacks runs from <code>infra/tf.sh</code> (Terraform 1.17.2 in Docker, AWS provider 6.73).' ],
+      why: 'One image for API, agent and website keeps deploys to a single service with no separate web hosting.' },
+    { id: 'iam', tag: 'aws', where: 'Global (IAM)', title: 'IAM + STS', items: [
+      'OIDC provider <code>token.actions.githubusercontent.com</code>, audience <code>sts.amazonaws.com</code>.',
+      'Role <code>advisoragent-github-deploy</code>: trusted only for subject <code>repo:jchandel8@191924894/AdvisorAgent@1452303973:environment:demo</code>; sessions at most 1 hour; AdministratorAccess for now (to narrow).',
+      '<strong>Execution role</strong>: pull from ECR, write logs, read the 3 secrets.',
+      '<strong>Infrastructure role</strong>: lets ECS Express manage the load balancer, certificate and scaling (AWS-managed policy).',
+      '<strong>Task role</strong>: the app itself, only Cognito admin calls on this pool.' ],
+      why: 'Least privilege per job: the running app can\'t read secrets it wasn\'t given or touch other AWS resources.' },
+    { id: 's3', tag: 'aws', where: 'us-west-1', title: 'S3 state bucket', items: [
+      '<code>advisoragent-tfstate-900896541106</code>, versioning on, AES-256 encryption, all public access blocked.',
+      'Holds <code>app/terraform.tfstate</code>, Terraform\'s record of what the app stack created.',
+      'Locking with an S3 lock file (<code>use_lockfile</code>), no DynamoDB table needed.' ],
+      why: 'GitHub runners are throwaway machines, so the state must live somewhere shared and durable.' },
+    { id: 'ecr', tag: 'aws', where: 'us-west-1', title: 'ECR', items: [
+      'Repository <code>advisoragent</code>; each image tagged with its git commit SHA.',
+      'Scan on push; lifecycle rule keeps the 10 most recent images.',
+      'Kept after teardown, so redeploys can reuse images.' ],
+      why: 'A private registry next to ECS: fast pulls, IAM-controlled access.' },
+    { id: 'secrets', tag: 'aws', where: 'us-west-1', title: 'Secrets Manager', items: [
+      '<code>advisoragent/anthropic-api-key</code> and <code>advisoragent/demo-password</code>: Terraform creates the empty secrets; you put the values in with the CLI, so Terraform never sees them.',
+      'RDS-managed <code>rds!db-…</code> secret: created and rotated by RDS, deleted with the database.',
+      'Values are injected into the container at start; they never appear in images, logs or GitHub.' ],
+      why: 'Secrets stay out of code, state files and CI logs.' },
+    { id: 'alb', tag: 'vpc', where: 'Default VPC', title: 'Load balancer (via ECS Express)', items: [
+      'Created and managed by Express Mode, not written in Terraform.',
+      'Public HTTPS URL <code>https://ad-&lt;id&gt;.ecs.us-west-1.on.aws</code> with an AWS-provided certificate.',
+      'Health check <code>/api/health</code>; forwards to container port 8000. The URL changes if the service is re-created.' ],
+      why: 'HTTPS and a stable entry point without hand-writing listeners, target groups and certificates.' },
+    { id: 'task', tag: 'vpc', where: 'Default VPC', title: 'Fargate task', items: [
+      '0.5 vCPU, 1 GB memory, x86_64; one task (min = max = 1); autoscaling metric CPU at 60% set explicitly.',
+      'Environment: <code>AUTH_MODE=cognito</code>, Cognito IDs, <code>ANTHROPIC_MODEL</code>, <code>DB_HOST/USER/NAME</code>. Secrets injected separately.',
+      '<code>start.sh</code>: migrate, seed if empty, create demo logins, then uvicorn with <code>--proxy-headers</code>.',
+      'Public IP in a default subnet for outbound internet (Anthropic, ECR, Secrets Manager, Cognito).' ],
+      why: 'Serverless containers: no EC2 instances to patch.' },
+    { id: 'rds', tag: 'vpc', where: 'Default VPC', title: 'RDS PostgreSQL', items: [
+      'PostgreSQL 17, <code>db.t4g.micro</code>, 20 GB gp3, encrypted, single-AZ, not publicly accessible.',
+      'Database <code>wealth</code>, user <code>wealth_admin</code>, password managed by RDS.',
+      'Security group <code>advisoragent-db</code>: port 5432 only from the VPC\'s address range.',
+      'Backups kept 1 day; no final snapshot on delete (demo data is re-seeded).' ],
+      why: 'Same Postgres as local Docker, so the code and SQL are identical.' },
+    { id: 'cognito', tag: 'aws', where: 'us-west-1', title: 'Cognito', items: [
+      'Pool <code>us-west-1_yZ66inLgw</code>; groups <code>advisors</code>, <code>clients</code>, <code>admins</code>; username equals the database username.',
+      'Public app client (no secret), authorization code + PKCE; access and ID tokens 60 minutes, refresh 12 hours.',
+      'Passwords: 12+ characters with upper, lower and a number.',
+      'Allow-list kept current by the deploy workflow; Terraform ignores those two lists.' ],
+      why: 'No passwords stored by the app; the backend trusts only a verified token.' },
+    { id: 'ecs', tag: 'aws', where: 'us-west-1', title: 'ECS Express service', items: [
+      'Cluster <code>advisoragent</code>, service <code>advisoragent</code> (<code>aws_ecs_express_gateway_service</code>).',
+      'Terraform waits for steady state, so a broken container fails the deploy instead of silently.',
+      'Provider 6.73 quirks: <code>log_stream_prefix</code> is required; autoscaling values must be set explicitly.' ],
+      why: 'One resource replaces a dozen: service, task definition, load balancer, scaling.' },
+    { id: 'logs', tag: 'aws', where: 'us-west-1', title: 'CloudWatch Logs', items: [
+      'Log group <code>/advisoragent/app</code>, 14-day retention, streams <code>app/…</code>.',
+      'Read live with <code>aws logs tail /advisoragent/app --follow</code>.' ],
+      why: 'First place to look when a deploy is unhealthy.' },
+    { id: 'anthropic', tag: 'ext', where: 'Outside AWS', title: 'Anthropic API', items: [
+      'Claude Haiku 5.5 for the scope check, Sonnet 5.5 for the agent.',
+      'Key from Secrets Manager; reached over HTTPS through the task\'s public IP.',
+      'Spend limit set on the key in the Anthropic Console; app limits of 10 a minute and 100 a day per advisor.' ],
+      why: 'Could move to Amazon Bedrock later to keep model calls inside the AWS account.' },
+  ];
+
+  const svg = document.getElementById('map');
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; };
+
+  const zg = document.getElementById('zones');
+  ZONES.forEach((z) => {
+    el('rect', { x: z.x, y: z.y, width: z.w, height: z.h, rx: 14, class: z.cls }, zg);
+    const t = el('text', { x: z.lx, y: z.ly, class: 'zl', style: `fill:${z.color}` }, zg); t.textContent = z.label;
+  });
+  const eg = document.getElementById('edges');
+  const pathEls = {};
+  for (const id in EDGES) pathEls[id] = el('path', { d: EDGES[id].d, class: 'edge', 'marker-end': 'url(#ah)' }, eg);
+  const ng = document.getElementById('nodes');
+  const nodeEls = {};
+  for (const id in NODES) {
+    const n = NODES[id];
+    const g = el('g', { class: 'node', tabindex: 0, role: 'button', 'aria-label': `${n.t}: show settings` }, ng);
+    el('rect', { x: n.x, y: n.y, width: n.w, height: n.h, rx: 9 }, g);
+    el('text', { x: n.x + 12, y: n.y + 22, class: 't' }, g).textContent = n.t;
+    n.s.forEach((line, i) => { el('text', { x: n.x + 12, y: n.y + 40 + i * 15, class: 's' }, g).textContent = line; });
+    const go = () => showCard(id);
+    g.addEventListener('click', go);
+    g.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); } });
+    nodeEls[id] = g;
+  }
+
+  const cardsEl = document.getElementById('cards');
+  const cardFor = {};
+  CARDS.forEach((c) => {
+    const div = document.createElement('article');
+    div.className = 'card'; div.id = `svc-${c.id}`;
+    div.innerHTML = `<header><h3 class="tag-${c.tag}">${c.title}</h3><span class="where">${c.where}</span></header>
+      <ul>${c.items.map((i) => `<li>${i}</li>`).join('')}</ul><p class="why">${c.why}</p>`;
+    cardsEl.appendChild(div); cardFor[c.id] = div;
+  });
+  const CARD_ALIAS = { ci: 'runner', browser: 'alb' };
+  function showCard(id) {
+    const card = cardFor[id] || cardFor[CARD_ALIAS[id]];
+    if (!card) return;
+    card.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+    card.classList.add('flash'); setTimeout(() => card.classList.remove('flash'), 1600);
+  }
+
+  // ---- playback ----
+  const packet = document.getElementById('packet');
+  const chip = document.getElementById('chip');
+  const chipRect = chip.querySelector('rect'), chipText = chip.querySelector('text');
+  const stepsEl = document.getElementById('steps');
+  const nowNum = document.getElementById('now-num'), nowText = document.getElementById('now-text');
+  const playBtn = document.getElementById('play'), nextBtn = document.getElementById('next');
+  const tabs = [...document.querySelectorAll('.tab')];
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let scenario = 'build', index = 0, playing = !reduceMotion, token = 0;
+
+  function clear() {
+    svg.querySelectorAll('.on, .kept, .gone').forEach((e) => e.classList.remove('on', 'kept', 'gone'));
+    chip.style.visibility = 'hidden';
+  }
+  function renderSteps() {
+    const s = SCENARIOS[scenario];
+    document.documentElement.style.setProperty('--packet', s.color);
+    stepsEl.innerHTML = '';
+    s.steps.forEach((st, i) => {
+      const li = document.createElement('li'); li.tabIndex = 0;
+      const span = document.createElement('span'); span.innerHTML = st.text; li.appendChild(span);
+      li.addEventListener('click', () => go(i, false));
+      li.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(i, false); } });
+      stepsEl.appendChild(li);
+    });
+    tabs.forEach((t) => t.setAttribute('aria-pressed', String(t.dataset.scenario === scenario)));
+  }
+  function mark(i) {
+    const st = SCENARIOS[scenario].steps[i];
+    [...stepsEl.children].forEach((li, j) => { li.classList.toggle('on', j === i); li.classList.toggle('done', j < i); });
+    nowNum.textContent = String(i + 1); nowText.innerHTML = st.text;
+    clear();
+    st.n.forEach((id) => nodeEls[id].classList.add('on'));
+    (st.kept || []).forEach((id) => nodeEls[id].classList.add('kept'));
+    (st.gone || []).forEach((id) => nodeEls[id].classList.add('gone'));
+  }
+  function showChip(label, p) {
+    chipText.textContent = label;
+    const w = chipText.getComputedTextLength() + 14;
+    const x = Math.min(Math.max(p.x - w / 2, 4), 1196 - w), y = Math.max(p.y - 32, 2);
+    chip.setAttribute('transform', `translate(${x} ${y})`);
+    chipRect.setAttribute('width', w); chipText.setAttribute('x', 7);
+    chip.style.visibility = 'visible';
+  }
+  function travel(id, reverse, my) {
+    return new Promise((resolve) => {
+      const path = pathEls[id]; if (!path) return resolve();
+      path.classList.add('on');
+      const len = path.getTotalLength();
+      showChip(EDGES[id].label, path.getPointAtLength(len / 2));
+      packet.style.visibility = 'visible';
+      if (reduceMotion) { const p = path.getPointAtLength(reverse ? 0 : len); packet.setAttribute('transform', `translate(${p.x} ${p.y})`); return resolve(); }
+      const dur = Math.max(450, len / 0.3), start = performance.now();
+      const frame = (now) => {
+        if (my !== token) return resolve();
+        const t = Math.min(1, (now - start) / dur);
+        const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const p = path.getPointAtLength((reverse ? 1 - e : e) * len);
+        packet.setAttribute('transform', `translate(${p.x} ${p.y})`);
+        if (t < 1) requestAnimationFrame(frame); else resolve();
+      };
+      requestAnimationFrame(frame);
+    });
+  }
+  async function runStep(i, my) {
+    mark(i);
+    const edges = SCENARIOS[scenario].steps[i].e;
+    if (!edges.length) packet.style.visibility = 'hidden';
+    for (const [id, rev] of edges) { if (my !== token) return; await travel(id, !!rev, my); }
+  }
+  const wait = (ms, my) => new Promise((r) => setTimeout(() => r(my === token), ms));
+  async function loop(my) {
+    while (playing && my === token) {
+      await runStep(index, my);
+      const words = SCENARIOS[scenario].steps[index].text.replace(/<[^>]+>/g, '').split(/\s+/).length;
+      if (!(await wait(Math.min(6500, 1600 + words * 110), my))) return;
+      index = (index + 1) % SCENARIOS[scenario].steps.length;
+      if (index === 0 && !(await wait(1200, my))) return;
+    }
+  }
+  function updatePlay() { playBtn.textContent = playing ? 'Pause' : 'Play'; }
+  function go(i, keep = playing) {
+    token++; index = i; playing = keep && !reduceMotion; updatePlay();
+    const my = token; if (playing) loop(my); else runStep(index, my);
+  }
+  tabs.forEach((t) => t.addEventListener('click', () => { scenario = t.dataset.scenario; renderSteps(); go(0, !reduceMotion); }));
+  playBtn.addEventListener('click', () => { if (playing) { playing = false; token++; updatePlay(); mark(index); } else go(index, true); });
+  nextBtn.addEventListener('click', () => go((index + 1) % SCENARIOS[scenario].steps.length, false));
+  if (reduceMotion) playBtn.hidden = true;
+  renderSteps(); go(0, !reduceMotion);
+})();
+</script>
