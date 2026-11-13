@@ -65,7 +65,9 @@ resource "aws_iam_openid_connect_provider" "github" {
   client_id_list = ["sts.amazonaws.com"]
 }
 
-# Only workflows running on this repository's main branch can assume the role.
+# Only this repository's "demo" environment can assume the role. Jobs that use an environment get the OIDC
+# subject repo:<owner>/<repo>:environment:<name> (not the branch), so the branch rule lives on the GitHub
+# side: the demo environment's deployment branches are limited to main (see docs/DEPLOY.md).
 data "aws_iam_policy_document" "github_trust" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -81,7 +83,7 @@ data "aws_iam_policy_document" "github_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:ref:refs/heads/main"]
+      values   = ["repo:${var.github_repo}:environment:demo"]
     }
   }
 }
@@ -93,7 +95,7 @@ resource "aws_iam_role" "github_deploy" {
 }
 
 # Terraform creates IAM roles, RDS, ECS and more, so the deploy role needs broad rights. It is limited to
-# this repository's main branch and short-lived sessions. Tighten to a custom policy before real use.
+# this repository's demo environment (main branch only) and short-lived sessions. Tighten to a custom policy before real use.
 resource "aws_iam_role_policy_attachment" "github_deploy_admin" {
   role       = aws_iam_role.github_deploy.name
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"

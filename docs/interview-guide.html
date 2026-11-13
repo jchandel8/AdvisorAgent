@@ -1,0 +1,454 @@
+<title>AdvisorAgent Interview Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=Instrument+Serif&display=swap">
+<style>
+  /* Layout: a single reading column for phone study; each build layer is a section with "what / why / say it",
+     then interview Q&A as expandable items, then the open to-do list. Tokens match the app's design system. */
+  :root {
+    --paper: #f6f7f5;
+    --surface: #ffffff;
+    --sunk: #eef1ef;
+    --ink: #17201d;
+    --muted: #55625d;
+    --rule: #dce1de;
+    --accent: #0e5a4a;
+    --accent-soft: #e3f0ec;
+    --aws: #a35200;
+    --ai: #8a5a00;
+    --say: #2e3a8c;
+    --say-soft: #eceefb;
+    --sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #111816; --surface: #18211e; --sunk: #141c19; --ink: #e6ece9; --muted: #a3b0ab; --rule: #2c3833;
+      --accent: #5fbfa6; --accent-soft: #1b2c27; --aws: #f0a95a; --ai: #e8b45a; --say: #b3bcf7; --say-soft: #1f2340;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #111816; --surface: #18211e; --sunk: #141c19; --ink: #e6ece9; --muted: #a3b0ab; --rule: #2c3833;
+    --accent: #5fbfa6; --accent-soft: #1b2c27; --aws: #f0a95a; --ai: #e8b45a; --say: #b3bcf7; --say-soft: #1f2340;
+    color-scheme: dark;
+  }
+
+  body { background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.6; }
+  .wrap {
+    max-width: 760px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 40px 72px;
+    display: grid; gap: 44px;
+  }
+  h1, h2, h3 { line-height: 1.2; text-wrap: balance; margin: 0; }
+  h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(2.25rem, 7vw, 3.25rem); letter-spacing: -0.01em; }
+  h2 { font-family: var(--serif); font-weight: 400; font-size: 1.875rem; }
+  h3 { font-size: 1.0625rem; font-weight: 650; }
+  p, ul, ol { margin: 0; }
+  ul, ol { padding-left: 1.25rem; display: grid; gap: 6px; }
+  .lede { color: var(--muted); max-width: 62ch; }
+  code { font-family: var(--mono); font-size: 0.84em; background: var(--sunk); padding: 0.08em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+  section { display: grid; gap: 16px; min-width: 0; }
+  .stack { display: grid; gap: 12px; }
+
+  nav.toc { border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding-block: 14px; }
+  nav.toc ol { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 0; list-style: none; font-size: 0.9375rem; }
+  nav.toc a { color: var(--accent); text-decoration: none; display: inline-flex; min-height: 32px; align-items: center; }
+  nav.toc a:hover { text-decoration: underline; }
+
+  .pitch { background: var(--accent-soft); border-radius: 12px; padding: 20px 22px; display: grid; gap: 10px; }
+  .pitch p { font-size: 1.0625rem; }
+  .rule-box { border: 1.5px solid var(--accent); border-radius: 12px; padding: 18px 20px; display: grid; gap: 8px; }
+  .rule-box strong { color: var(--accent); }
+
+  .layer { border-top: 1px solid var(--rule); padding-top: 22px; display: grid; gap: 12px; }
+  .layer .kicker { color: var(--muted); font-size: 0.875rem; }
+  .say { background: var(--say-soft); border-left: 3px solid var(--say); border-radius: 0 8px 8px 0; padding: 12px 16px; }
+  .say b { color: var(--say); font-weight: 650; display: block; font-size: 0.8125rem; margin-bottom: 2px; }
+  .why { color: var(--muted); }
+  .why b { color: var(--ink); font-weight: 600; }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
+  th, td { text-align: left; padding: 10px 12px; border-top: 1px solid var(--rule); vertical-align: top; }
+  thead th { border-top: 0; color: var(--muted); font-weight: 500; font-size: 0.8125rem; }
+  td:first-child { font-family: var(--mono); font-size: 0.8125rem; white-space: nowrap; }
+  .aws { color: var(--aws); }
+
+  details { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; }
+  details + details { margin-top: 8px; }
+  summary { cursor: pointer; padding: 14px 16px; font-weight: 600; min-height: 44px; list-style-position: outside; }
+  details > div { padding: 0 16px 16px; display: grid; gap: 8px; color: var(--ink); }
+  details[open] summary { border-bottom: 1px solid var(--rule); margin-bottom: 12px; }
+
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .fact { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; }
+  .fact .n { font-size: 1.375rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .fact .l { color: var(--muted); font-size: 0.875rem; line-height: 1.35; }
+
+  .todo { counter-reset: t; list-style: none; padding: 0; gap: 10px; }
+  .todo li { counter-increment: t; display: grid; grid-template-columns: 2rem 1fr; gap: 6px; }
+  .todo li::before { content: counter(t); font-weight: 650; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .ask { color: var(--aws); font-weight: 600; }
+  :focus-visible { outline: 2px solid var(--say); outline-offset: 2px; }
+  a { color: var(--accent); }
+</style>
+
+<div class="wrap">
+  <header class="stack">
+    <h1>AdvisorAgent, explained for the interview</h1>
+    <p class="lede">What was built, why each choice was made, and a sentence you can say about each part.
+      Read top to bottom once; then use the questions section to practise out loud.</p>
+  </header>
+
+  <nav class="toc" aria-label="Sections">
+    <ol>
+      <li><a href="#pitch">The pitch</a></li>
+      <li><a href="#layers">Layer by layer</a></li>
+      <li><a href="#terraform">The Terraform</a></li>
+      <li><a href="#deploy">Deploy flow</a></li>
+      <li><a href="#numbers">Numbers</a></li>
+      <li><a href="#questions">Interview questions</a></li>
+      <li><a href="#notdone">Not done yet</a></li>
+      <li><a href="#tomorrow">Tomorrow's list</a></li>
+    </ol>
+  </nav>
+
+  <section id="pitch" aria-labelledby="pitch-h">
+    <h2 id="pitch-h">The 30-second pitch</h2>
+    <div class="pitch">
+      <p>"AdvisorAgent is a wealth-management app where financial advisors ask questions in plain English, like
+        <em>which of my clients are overweight in tech and have a review due this month</em>, and a Claude-powered agent
+        answers by calling read-only tools over portfolio data. There are three portals: advisor, client and admin.
+        The point of the project is security: the AI can only ever see the accounts the signed-in advisor is
+        allowed to see, and that is enforced in the database query, not in the prompt."</p>
+    </div>
+    <div class="rule-box">
+      <p><strong>The one security rule.</strong> Who you are comes only from the verified login token (Cognito),
+        never from the prompt, the model or the browser. Every tool gets <code>advisor_id</code> from the backend,
+        and every query joins through the <code>account_access</code> table. The model never writes SQL.</p>
+    </div>
+  </section>
+
+  <section id="layers" aria-labelledby="layers-h">
+    <h2 id="layers-h">Layer by layer</h2>
+    <p class="lede">In build order. Each part has what it is, why it's that way, and the line to say.</p>
+
+    <div class="layer">
+      <span class="kicker">Step 1 · Database</span>
+      <h3>Postgres schema with an access list at the centre</h3>
+      <p>Accounts are the central entity. Holdings, transactions, performance and documents all belong to an
+        account. The <code>account_access</code> table links one account to one person with a role (owner,
+        joint owner, advisor, viewer). It has two real foreign keys, <code>advisor_id</code> and
+        <code>client_id</code>, and CHECK constraints so exactly one is filled and the role fits the person type.</p>
+      <p class="why"><b>Why:</b> the database itself refuses a bad permission row. Values like market value and gains
+        are computed in SQL, never stored, so they can't go stale. Plain SQL with psycopg (no ORM) keeps the
+        access join visible.</p>
+      <div class="say"><b>Say it</b>"Permissions are data, not code. One table decides who sees what, and constraints
+        stop invalid rows from ever existing."</div>
+    </div>
+
+    <div class="layer">
+      <span class="kicker">Step 1 · Data</span>
+      <h3>A deterministic mock-data generator</h3>
+      <p>Faker with seed 42 makes 10 advisors, 200 clients and 348 accounts (15% joint, about 10% with two
+        advisors). Holdings aren't random: they come from replaying two years of simulated transactions against
+        a price path, so holdings, cost basis, gains and returns all agree. Some clients are deliberately
+        tech-heavy so the demo question has a real answer.</p>
+      <div class="say"><b>Say it</b>"Same seed, same data every run, so tests and demos are repeatable. And the numbers
+        reconcile, because holdings are derived from transactions."</div>
+    </div>
+
+    <div class="layer">
+      <span class="kicker">Step 1 · Security core</span>
+      <h3>One access layer every query uses</h3>
+      <p>A single SQL fragment, <code>VISIBLE</code>, lists the accounts the current person can see. Every tool and
+        every portal endpoint starts from it. If an advisor shares one account with a client, they see that
+        client but only that shared account. Asking for an account you can't see returns the same
+        "not found" as an account that doesn't exist, so IDs can't be probed.</p>
+      <div class="say"><b>Say it</b>"There's exactly one place access is decided. A test runs every tool as an advisor with
+        no access, so a new tool that forgets the join fails automatically."</div>
+    </div>
+
+    <div class="layer">
+      <span class="kicker">Step 1 · AI agent</span>
+      <h3>Six tools and a manual tool-use loop</h3>
+      <p>Tools: <code>get_my_clients</code>, <code>get_accounts</code>, <code>get_holdings</code>,
+        <code>get_transactions</code>, <code>get_performance</code>, <code>find_reviews_due</code>. Their schemas sent
+        to Claude don't contain <code>advisor_id</code> at all. The model's input is validated with Pydantic set to
+        forbid extra fields, so a model that tries to pass <code>advisor_id</code> is rejected. The backend
+        then calls the tool with the signed-in advisor's ID. Tools run in read-only transactions and do the
+        math in SQL. The loop runs up to 10 rounds with Claude Sonnet 5.5.</p>
+      <p class="why"><b>Why a manual loop:</b> every step is readable code, which makes it easy to add checks between
+        steps and easy to explain.</p>
+      <div class="say"><b>Say it</b>"Even if the model is tricked by a prompt injection, the worst it can do is ask for
+        data this advisor is already allowed to see."</div>
+    </div>
+
+    <div class="layer">
+      <span class="kicker">Added after testing · Guardrails</span>
+      <h3>Keeping the assistant on task and honest</h3>
+      <ul>
+        <li><b>Scope check:</b> Claude Haiku 5.5 classifies each question first (in scope, off topic, manipulation).
+          If the check fails, the question is blocked. This was added after "what's the diameter of the moon?" got an answer.</li>
+        <li><b>Facts only:</b> the prompt forbids buy or sell recommendations.</li>
+        <li><b>Selected client is a hard scope:</b> picking a client in the chat dropdown filters the access layer
+          itself, so other clients can't leak in.</li>
+        <li><b>Answer check:</b> if the answer quotes figures but no tool was called, it's replaced and removed
+          from history.</li>
+        <li><b>Limits:</b> 10 a minute, 100 a day per advisor, with an audit row for every request.</li>
+        <li><b>Answer cache:</b> repeat questions are free. The key includes a fingerprint of the advisor's
+          permissions, so a grant or revoke automatically stops old answers being served.</li>
+      </ul>
+      <div class="say"><b>Say it</b>"Defence in depth: a cheap classifier in front, data-level scoping in the middle,
+        a fabrication check at the end, and cost limits around all of it."</div>
+    </div>
+
+    <div class="layer">
+      <span class="kicker">Step 2 · Backend and frontend</span>
+      <h3>FastAPI and one Angular app with three portals</h3>
+      <p>One FastAPI service serves the client, advisor and admin endpoints plus the assistant. The Angular app
+        (signals, standalone components, Tailwind, ECharts) has <code>/advisor</code>, <code>/client</code> and
+        <code>/admin</code>. The backend checks role and access on every call; the frontend hiding a page is only
+        convenience. Locally, <code>docker compose up</code> starts Postgres, API and web together.</p>
+      <div class="say"><b>Say it</b>"The UI is untrusted. You can open the advisor portal and the client portal side by
+        side and see the same account from both sides."</div>
+    </div>
+
+    <div class="layer">
+      <span class="kicker">Step 3 · Login</span>
+      <h3>Amazon Cognito with three groups</h3>
+      <p>The user pool has groups <code>advisors</code>, <code>clients</code> and <code>admins</code>. The frontend uses the
+        authorization code flow with PKCE (the standard flow for browser apps; no secret in the browser). The
+        backend verifies the access token itself: signature against Cognito's public keys (JWKS), issuer,
+        expiry, token type, app client ID, and exactly one group. The Cognito username matches the database
+        username. A local "demo picker" mode exists for development and refuses to start on AWS.</p>
+      <p>Playwright browser tests log in and check what each role can see.</p>
+      <div class="say"><b>Say it</b>"Passwords never touch my app or database. Cognito handles them; I only verify a
+        signed token."</div>
+    </div>
+
+    <div class="layer">
+      <span class="kicker">Step 4 · Admin</span>
+      <h3>Admin portal, audit log, reset</h3>
+      <p>Admins create users (database row and Cognito login together), create accounts, and grant or revoke
+        access. Each change and its <code>permission_audit</code> row are written in the same transaction, so there's
+        never a change without a record. Rules prevent leaving an account with no owner or no advisor. Admins
+        manage access but don't read portfolios. A reset script restores the seeded data for demos.</p>
+      <div class="say"><b>Say it</b>"Audit and change are atomic: if the audit insert fails, the grant rolls back."</div>
+    </div>
+
+    <div class="layer">
+      <span class="kicker">Step 5 · Packaging</span>
+      <h3>One production container</h3>
+      <p>A multi-stage <code>Dockerfile</code>: stage one builds Angular, stage two is Python with the built files
+        copied in, so FastAPI serves the website and the API from one container. On start,
+        <code>start.sh</code> runs migrations, seeds data only if the database is empty, creates the Cognito demo
+        logins, then starts the server.</p>
+      <div class="say"><b>Say it</b>"One image, one service, no separate web hosting. A fresh deploy comes up already
+        seeded and demo-ready."</div>
+    </div>
+  </section>
+
+  <section id="terraform" aria-labelledby="tf-h">
+    <h2 id="tf-h">The Terraform, file by file</h2>
+    <p class="lede">Terraform describes AWS resources as code; <code>plan</code> shows what would change,
+      <code>apply</code> makes it so, and a <em>state file</em> remembers what exists. The code is split into
+      three stacks because the parts have different lifetimes.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">Stack</th><th scope="col">What it creates</th><th scope="col">Lifetime / status</th></tr></thead>
+        <tbody>
+          <tr><td>infra/bootstrap</td>
+            <td>S3 bucket for the app stack's state file; GitHub OIDC identity provider; IAM role
+              <code>advisoragent-github-deploy</code> that only the repo's <code>main</code> branch can assume.</td>
+            <td>Once. <span class="aws">Not applied.</span></td></tr>
+          <tr><td>infra/persistent</td>
+            <td>Cognito pool, app client, hosted login domain and 3 groups. ECR image registry (with a rule that
+              keeps only recent images). Two Secrets Manager entries: Anthropic API key and demo password (values
+              typed in by you, never in code).</td>
+            <td>Kept forever. Cognito <b>applied</b>; ECR and secrets <span class="aws">not applied</span>.</td></tr>
+          <tr><td>infra/app</td>
+            <td>RDS Postgres 17 (db.t4g.micro, private, encrypted, password managed by RDS); security group allowing
+              port 5432 only from inside the VPC; ECS cluster; ECS Express Mode service (0.5 vCPU, 1 GB, port 8000,
+              health check <code>/api/health</code>); three IAM roles; CloudWatch log group. Output: <code>APP_URL</code>.</td>
+            <td>Disposable: Deploy creates it, Teardown destroys it. <span class="aws">Not applied.</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <details>
+      <summary>Why three stacks instead of one?</summary>
+      <div>
+        <p><b>Bootstrap</b> exists because of a chicken-and-egg problem: the S3 bucket that stores Terraform state
+          can't store its own state, so it's created separately with local state.</p>
+        <p><b>Persistent</b> holds things that are slow or painful to recreate: Cognito users, the image registry and
+          the secrets (deleted secrets keep their name reserved for days, so recreating them fails).</p>
+        <p><b>App</b> holds everything that costs money by the hour. Destroying only this stack takes the bill
+          from about $60–90 a month to about $1–3.</p>
+      </div>
+    </details>
+    <details>
+      <summary>What are the three IAM roles in the app stack?</summary>
+      <div>
+        <p><b>Execution role:</b> used by ECS to start the container: pull the image from ECR, read the secrets, write logs.</p>
+        <p><b>Task role:</b> what the running app itself may do: only the Cognito admin calls needed to create users.</p>
+        <p><b>Infrastructure role:</b> lets Express Mode create and manage the load balancer, certificate and
+          scaling on your behalf (AWS-managed policy).</p>
+        <p>Separating them is least privilege: the app code can't, for example, read secrets it wasn't given.</p>
+      </div>
+    </details>
+    <details>
+      <summary>How does the app get the database password?</summary>
+      <div>
+        <p>RDS creates and rotates the master password itself and stores it in Secrets Manager
+          (<code>manage_master_user_password</code>). ECS injects just the password field into the container as
+          <code>DB_PASSWORD</code>. <code>config.py</code> assembles the connection string from <code>DB_HOST</code>,
+          <code>DB_USER</code>, <code>DB_PASSWORD</code> with <code>sslmode=require</code>. The password is never in code,
+          Terraform files or GitHub.</p>
+      </div>
+    </details>
+    <details>
+      <summary>What is ECS Express Mode and why use it?</summary>
+      <div>
+        <p>A newer, simpler way to run a container on ECS Fargate: you give it an image, a port and a health check,
+          and it creates the load balancer, HTTPS URL, target group and scaling for you. Fargate means no servers
+          to manage. It replaces a lot of hand-written load balancer Terraform.</p>
+      </div>
+    </details>
+    <details>
+      <summary>Why the default VPC and no NAT Gateway?</summary>
+      <div>
+        <p>A NAT Gateway costs about $33 a month even when idle, more than the rest of the demo. Tasks in the default
+          VPC's public subnets get a public IP so they can reach the Anthropic API, ECR and Secrets Manager directly.
+          The database stays private: not publicly accessible, and its security group only accepts traffic from
+          inside the VPC. In production you'd use private subnets with NAT or VPC endpoints. This is the one part
+          not yet proven on AWS.</p>
+      </div>
+    </details>
+    <details>
+      <summary>How is Terraform run?</summary>
+      <div>
+        <p><code>infra/tf.sh</code> runs a pinned Terraform version (1.17.2) inside Docker, so nothing has to be
+          installed and everyone uses the same version. Provider versions are locked in
+          <code>.terraform.lock.hcl</code>. All three stacks pass <code>terraform validate</code>; plans show 7 resources
+          for bootstrap and 4 new ones for persistent.</p>
+      </div>
+    </details>
+  </section>
+
+  <section id="deploy" aria-labelledby="deploy-h">
+    <h2 id="deploy-h">The deploy flow (GitHub Actions)</h2>
+    <ol>
+      <li><b>CI</b> (<code>ci.yml</code>, every push): lint with ruff, run the backend tests against a real Postgres
+        service, run the frontend tests and build.</li>
+      <li><b>Deploy</b> (<code>deploy.yml</code>, button): GitHub proves its identity to AWS with an OIDC token and
+        gets short-lived credentials for the deploy role. No AWS keys are stored in GitHub. It builds the image,
+        pushes it to ECR, runs <code>terraform apply</code> on the app stack, and prints the URL.</li>
+      <li><b>Teardown</b> (<code>teardown.yml</code>, button): you must type <code>DESTROY</code>; it destroys only the app stack.</li>
+    </ol>
+    <div class="say"><b>Say it</b>"Keyless deploys: GitHub's OIDC token is trusted only for my repo's main branch, and
+      the credentials expire after the job."</div>
+  </section>
+
+  <section id="numbers" aria-labelledby="num-h">
+    <h2 id="num-h">Numbers worth remembering</h2>
+    <div class="facts">
+      <div class="fact"><div class="n">230</div><div class="l">backend tests passing</div></div>
+      <div class="fact"><div class="n">6 + 9</div><div class="l">browser and frontend unit tests</div></div>
+      <div class="fact"><div class="n">348</div><div class="l">accounts, 10 advisors, 200 clients</div></div>
+      <div class="fact"><div class="n">6</div><div class="l">read-only agent tools</div></div>
+      <div class="fact"><div class="n">10 / 100</div><div class="l">assistant limit per minute / per day</div></div>
+      <div class="fact"><div class="n">$60–90</div><div class="l">per month if always on, plus Claude usage</div></div>
+      <div class="fact"><div class="n">$1–3</div><div class="l">per month when torn down</div></div>
+      <div class="fact"><div class="n">~15 min</div><div class="l">to bring the demo back up</div></div>
+    </div>
+  </section>
+
+  <section id="questions" aria-labelledby="q-h">
+    <h2 id="q-h">Questions to practise</h2>
+    <details>
+      <summary>What stops a prompt injection from reading another advisor's data?</summary>
+      <div><p>The model never controls identity. <code>advisor_id</code> isn't in any tool schema, model input that
+        includes it is rejected, and the backend injects the ID from the verified token. Every query filters
+        through <code>account_access</code>. So injection can change which allowed data is requested, never which
+        data is allowed.</p></div>
+    </details>
+    <details>
+      <summary>Why not let the model write SQL? It would be more flexible.</summary>
+      <div><p>Generated SQL can't be reliably checked for the access join, and one missed WHERE clause leaks
+        everything. Fixed tools with typed inputs are testable, and each does its math in SQL so the model
+        can't miscalculate totals.</p></div>
+    </details>
+    <details>
+      <summary>How do you know the access rules work?</summary>
+      <div><p>A small hand-built test fixture where the right answer is known: an advisor who shares one of a
+        client's accounts sees only that account; an advisor with no access sees nothing from any tool; a closed
+        account disappears. A parametrised test runs every registered tool as the no-access advisor, so new
+        tools are covered automatically.</p></div>
+    </details>
+    <details>
+      <summary>How do you control AI cost on a public demo?</summary>
+      <div><p>Haiku (cheap) screens questions before Sonnet runs; per-advisor limits of 10 a minute and 100 a day;
+        an answer cache so repeats cost nothing; prompt caching on the system prompt and tools; and the whole stack
+        can be torn down between demos.</p></div>
+    </details>
+    <details>
+      <summary>What happens when an admin grants access?</summary>
+      <div><p>One transaction inserts the <code>account_access</code> row and the audit row. On the advisor's next page
+        load the access layer includes the account, and the agent can answer about it. The cache key includes a
+        permissions fingerprint, so no stale cached answer survives the change.</p></div>
+    </details>
+    <details>
+      <summary>Why Cognito instead of your own login?</summary>
+      <div><p>No passwords stored anywhere I own; MFA, lockout and password reset come built in; groups map directly to
+        roles. The backend verifies tokens itself with the public keys rather than trusting the frontend.</p></div>
+    </details>
+    <details>
+      <summary>What would you change for real production?</summary>
+      <div><p>Private subnets with VPC endpoints or NAT; narrow the deploy role from admin to the exact permissions;
+        Multi-AZ RDS with backups and a final snapshot; two or more tasks; Bedrock instead of the Anthropic API so
+        data stays in the AWS account; tracing and alerts (planned in step 6); tighter guardrail evals.</p></div>
+    </details>
+    <details>
+      <summary>What was the hardest bug?</summary>
+      <div><p>Two good ones. Selecting a client in the chat still let the model answer about other clients, so the
+        selection became a filter inside the access layer rather than a prompt hint. And the answer cache
+        expired entries instantly once the pinned data date was in the past; found by a failing test, fixed by
+        using the real clock for expiry.</p></div>
+    </details>
+  </section>
+
+  <section id="notdone" aria-labelledby="nd-h">
+    <h2 id="nd-h">Be honest about what isn't done</h2>
+    <ul>
+      <li>Nothing from step 5 is on AWS yet; only the Cognito pool exists. Plans have been checked, not applied.</li>
+      <li>Internet access from the default VPC without NAT is expected to work but unproven.</li>
+      <li>The deploy role has AdministratorAccess for now; it should be narrowed after the first deploy.</li>
+      <li>Step 6 not started: MCP server for the tools, document search (Postgres full-text through the access
+        layer), tracing with CloudWatch and X-Ray, more evals.</li>
+    </ul>
+  </section>
+
+  <section id="tomorrow" aria-labelledby="tm-h">
+    <h2 id="tm-h">Tomorrow's checklist</h2>
+    <p class="lede">Items marked "needs your yes" change AWS, and Claude won't do them without your approval.</p>
+    <ol class="todo">
+      <li>Check the CI run on GitHub Actions from tonight's push (commit <code>594fad3</code>).</li>
+      <li>Local: <code>unset AUTH_MODE</code>, then <code>docker compose up</code>; <code>localhost:4200</code> should show the demo picker.</li>
+      <li>Create Cognito demo logins: <code>uv run python -m wealth.ops.demo_logins</code> in <code>backend/</code> to preview, then add <code>--apply</code>.</li>
+      <li>Decide on the hand-made <code>advisor1</code> login (no matching user, so it always says "not set up"). <span class="ask">Deleting needs your yes.</span></li>
+      <li>Apply bootstrap (7 resources) and the persistent additions (4 resources). <span class="ask">Needs your yes.</span></li>
+      <li>Put the Anthropic key and demo password into the two secrets.</li>
+      <li>In GitHub: repo variables <code>AWS_DEPLOY_ROLE_ARN</code> and <code>TFSTATE_BUCKET</code>, and an environment named <code>demo</code>.</li>
+      <li>Run Deploy (about 15 minutes); note the <code>APP_URL</code>. <span class="ask">Needs your yes.</span></li>
+      <li>Add <code>APP_URL</code> to Cognito's allowed URLs (<code>app_urls</code>) and re-apply persistent. <span class="ask">Needs your yes.</span></li>
+      <li>Then step 6.</li>
+    </ol>
+  </section>
+</div>
