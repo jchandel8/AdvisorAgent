@@ -215,7 +215,9 @@ class AdvisorAgent:
 
         # Guardrail 2: figures in an answer must come from looked-up data. If not, drop the whole turn
         # from the history so the model never builds on it, and reply with a fixed message.
-        if result.stop_reason == "end_turn" and unverified_figures(result.text, self._tools_used()):
+        if result.stop_reason == "end_turn" and unverified_figures(
+            result.text, self._tools_used(), SYSTEM_PROMPT
+        ):
             if self.trace is not None:
                 self.trace.add(
                     "note",

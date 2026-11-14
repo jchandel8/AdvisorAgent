@@ -14,7 +14,8 @@ Handoff notes so work can resume in any session. Update at the end of every step
 | Extras after 5 | Bedrock on AWS (Sonnet 4.6 / Haiku 4.5); admin drilldowns + Documents; document sharing (S3). Merged to main 2026-11-13; AWS torn down, next deploy needs the owner's yes |
 | 6a. MCP servers (Portfolio, Analytics); assistant uses MCP | **Done on branch `feature/mcp-servers`** (2026-11-13): 341 backend tests. Not merged yet |
 | 6b. Document search (`search_documents`, 7th tool) | **Done on branch `feature/document-search`** (2026-11-13): 366 backend tests. 6a merged to main |
-| 6c, 7 (AI Finalyst) | Planned in `docs/finalyst-plan.md` (approved 2026-11-13 with full admin traces + caching added) |
+| 6c. Full agent traces, admin Agent runs, caching, evals | **Done, merged** (2026-11-14): 387 backend, 15 frontend, 8 e2e tests; assistant eval 19/19 |
+| 7 (AI Finalyst) | Next. Planned in `docs/finalyst-plan.md` (approved 2026-11-13 with full admin traces + caching added) |
 
 ## How to run (local)
 
@@ -328,6 +329,31 @@ AWS changes (deploy, teardown, IAM, Bedrock access) still need the owner's expli
   fee and authority. Wording uses a separate per-account RNG, so every other table is byte-identical (checked
   by hashing). Local DB updated in place (683/683 seeded rows matched; uploads, audit and chats kept). AWS
   gets it on the next deploy (fresh seed).
+
+## Step 6c: traces, caching, evals (2026-11-14, merged)
+
+- Migration 009: `agent_runs`, `agent_steps`, `agent_prompts`; `permission_audit.agent_run_id` and action
+  `view_agent_run`. `wealth/agent/trace.py` (Tracer): every scope check, model call (new messages only),
+  tool call (exact input + full result), cache hit and answer-check note; secrets and thinking signatures
+  removed; 64 KB cap; TRACE_RETENTION_DAYS (30) purge on each save. Saved in its own transaction; a tracing
+  failure never fails the advisor's request.
+- Admin: `GET /api/admin/agent-runs` (filters) and `/agent-runs/{id}` (audited). Frontend: Admin -> Agent
+  runs (list + step timeline with request/response JSON); Assistant log links to traces.
+- Caching: SYSTEM_PROMPT is fixed (date moved to a `[Today: ...]` note on each question; `_without_notes`
+  strips it for the scope check); scope-check instructions cacheable. Live: 87% of input tokens read from
+  cache on a conversation; eval run 74% cache hit overall.
+- Cost: priced from the Claude API price table in trace.py (Opus/Sonnet/Haiku 5.5). Bedrock models show
+  "Not priced" (no guessed prices).
+- Evals: `wealth/evals/assistant.py` (19 cases, expectations computed from the live seed via the tools;
+  code graders + a Claude grader for judgment calls) and `evals/run_assistant.py` (`--dry-run` free).
+  First run 17/19, $0.31: fixed the answer check (it blocked "what can you do?" because of the documented
+  30% threshold; figures from the assistant's own instructions are now allowed) and a too-strict document
+  grader. Now 19/19. Free CI tests cover the graders and plumbing.
+- Shared API test fixture now overrides get_write_conn (a new test had reached the dev DB; nothing written).
+- Assistant chat: changing the selected client mid-chat now starts a new conversation (earlier turns said
+  "only this client", so the model kept refusing). Owner idea: several chats with different clients; see
+  the next plan.
+- e2e: admin drilldown test now picks a seeded document and uses the renamed "Opens and downloads" table.
 
 ## Known follow-ups
 

@@ -294,6 +294,9 @@ export class Assistant {
   });
 
   protected chooseClient(value: string): void {
+    // A conversation keeps the client it started with (earlier turns say which client was selected), so a
+    // different selection starts a fresh conversation instead of confusing the assistant.
+    if (this.messages().length) this.newConversation();
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { client: value || null },
