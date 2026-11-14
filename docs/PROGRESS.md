@@ -13,7 +13,8 @@ Handoff notes so work can resume in any session. Update at the end of every step
 | 5. AWS deploy (ECS Express, RDS, Secrets Manager), IaC, CI | **Deployed** (2026-11-13): https://ad-4e693211c8514b9389b0a39a34b07394.ecs.us-west-1.on.aws (Cognito callbacks added). Fixes found on the way: OIDC subject now has owner/repo IDs; Express needs `log_stream_prefix`; set `auto_scaling_metric`/`target_value` (provider 6.73 bug) and untainted the service. Default VPC egress works (no NAT). Next: owner tests phase 9 |
 | Extras after 5 | Bedrock on AWS (Sonnet 4.6 / Haiku 4.5); admin drilldowns + Documents; document sharing (S3). Merged to main 2026-11-13; AWS torn down, next deploy needs the owner's yes |
 | 6a. MCP servers (Portfolio, Analytics); assistant uses MCP | **Done on branch `feature/mcp-servers`** (2026-11-13): 341 backend tests. Not merged yet |
-| 6b, 6c, 7 (AI Finalyst) | Planned in `docs/finalyst-plan.md` (approved 2026-11-13 with full admin traces + caching added) |
+| 6b. Document search (`search_documents`, 7th tool) | **Done on branch `feature/document-search`** (2026-11-13): 366 backend tests. 6a merged to main |
+| 6c, 7 (AI Finalyst) | Planned in `docs/finalyst-plan.md` (approved 2026-11-13 with full admin traces + caching added) |
 
 ## How to run (local)
 
@@ -305,6 +306,23 @@ AWS changes (deploy, teardown, IAM, Bedrock access) still need the owner's expli
 - Each MCP tool call is about 3 loopback POSTs (protocol probe, initialize, call). Fine for now; revisit with a
   per-turn session if latency matters. Tool list is fetched once per process.
 - Live check: assistant as Anthony answered "38 clients" with get_my_clients over MCP.
+
+## Step 6b: document search (2026-11-13, branch feature/document-search)
+
+- Migration 008: `documents.extracted_text` and a generated `search_tsv` (title A, note B, body C) with a GIN
+  index. Seeded docs search their `text`; uploads search text extracted at upload (`wealth/text_extract.py`:
+  pypdf, python-docx, UTF-8 text; capped at 200k characters; failures never block the upload; no OCR).
+- Tool `search_documents(query, account_id|client_id, limit<=10)` in `wealth/tools/documents.py`: VISIBLE
+  join, deleted excluded, `websearch_to_tsquery` (quotes = phrase, -word = exclude), `ts_rank_cd`,
+  `ts_headline` snippets with « ». Served by the Portfolio MCP server automatically (registry).
+- Backfill for older uploads: `python -m wealth.ops.reindex_documents --apply` (ran locally: the 3 test
+  uploads have no readable text).
+- Scope guard and system prompt now include documents. Without that, Haiku blocked document questions.
+  Scope eval: 23/23 allowed, 22/23 blocked; the miss ("Danielle Johnson's clients", another advisor) was
+  there before the change and is harmless (tools only return the signed-in advisor's data).
+- Live check: "which clients have documents mentioning college savings" ran 3 searches over MCP and
+  answered honestly. Seeded document bodies are Faker filler, so search demos look odd: proposed follow-up
+  is realistic templated document text in the generator.
 
 ## Known follow-ups
 

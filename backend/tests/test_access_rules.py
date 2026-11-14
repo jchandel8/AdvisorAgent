@@ -191,6 +191,10 @@ def _calls_for(tool_name):
     if tool_name == "get_accounts":
         return [{"client_id": c} for c in ALL_CLIENTS]
     calls = [{"account_id": a} for a in ALL_ACCOUNTS] + [{"client_id": c} for c in ALL_CLIENTS]
+    if tool_name == "search_documents":  # every word in the fixture documents, unscoped and scoped
+        return [{"query": q} for q in ("target rebalance yearly", "college savings", "review policy")] + [
+            {**c, "query": "college"} for c in calls
+        ]
     if tool_name == "get_transactions":
         for c in calls:
             c.update(start_date="2000-01-01", end_date="2030-12-31")
@@ -201,7 +205,8 @@ def _calls_for(tool_name):
 def test_advisor_with_no_access_gets_nothing_from_any_tool(conn, tool_name):
     for args in _calls_for(tool_name):
         result = run(conn, A3, tool_name, **args)
-        assert result == NOT_FOUND or result.get("clients") == [], (tool_name, args, result)
+        nothing = result == NOT_FOUND or result.get("clients") == [] or result.get("results") == []
+        assert nothing, (tool_name, args, result)
 
 
 @pytest.mark.parametrize("tool_name", sorted(TOOLS))
@@ -226,6 +231,7 @@ def test_tool_definitions_are_complete():
         "get_transactions",
         "get_performance",
         "find_reviews_due",
+        "search_documents",  # step 6b
     }
 
 

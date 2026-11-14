@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import zipfile
 from contextlib import contextmanager
+from datetime import date
 
 import psycopg
 import pytest
@@ -290,6 +291,24 @@ def test_admin_sees_opens_from_the_portals(api, conn):
         ("view", "advisor", A1),
     }
     assert all(e["name"] for e in log) and len({e["key"] for e in log}) == 3
+
+
+def test_uploaded_file_text_is_searchable_by_the_agent_tools(api, conn):
+    from tests.test_document_search import pdf_with_text
+    from wealth.mcp.client import LocalToolRunner
+
+    doc = upload(
+        api, "client", C1, X, name="beneficiary.pdf", data=pdf_with_text("Meerkat trust beneficiary")
+    )
+    doc_id = doc.json()["document_id"]
+    row = conn.execute("SELECT extracted_text FROM documents WHERE id = %s", (doc_id,)).fetchone()
+    assert "Meerkat trust beneficiary" in row["extracted_text"]
+    hits = LocalToolRunner(conn).call(
+        "search_documents", {"query": "meerkat"}, advisor_id=A1, today=date.today()
+    )
+    assert [r["document_id"] for r in hits["results"]] == [doc_id]
+    # A file with no readable text still uploads.
+    assert upload(api, "client", C1, X, name="scan.png", data=PNG).status_code == 201
 
 
 # --- deleting ----------------------------------------------------------------------------------------
