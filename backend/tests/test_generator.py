@@ -226,3 +226,25 @@ def test_account_names_are_unique_per_owner(ds):
             names[r["client_id"]].append(acct["account_name"])
     for client_id, owned in names.items():
         assert len(owned) == len(set(owned)), (client_id, owned)
+
+
+def test_documents_read_like_real_documents(ds):
+    """Built from the account's own facts, not filler text (the agent searches and quotes them)."""
+    owners = defaultdict(list)
+    for r in ds.access:
+        if r["person_type"] == "client":
+            owners[r["account_id"]].append(r["client_id"])
+    clients = {c["id"]: c for c in ds.clients}
+    kinds = Counter(d[2] for d in ds.documents)
+    assert set(kinds) == {"ips", "review_notes", "statement", "agreement"}
+    for account_id, _title, kind, text, _size, _created in ds.documents:
+        owner = clients[owners[account_id][0]]
+        assert owner["last_name"] in text
+        if kind == "ips":
+            target = owner["target_allocation"]
+            assert f"equity {target['equity']:.0%}" in text and owner["risk_profile"] in text
+        if kind == "statement":
+            assert "Market value as of" in text and "$" in text
+    review_text = " ".join(d[3] for d in ds.documents if d[2] == "review_notes")
+    for topic in ("college savings", "retire", "beneficiary", "tax-loss harvesting", "rebalancing"):
+        assert topic in review_text, topic
