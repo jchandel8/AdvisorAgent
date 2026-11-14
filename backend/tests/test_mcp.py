@@ -277,7 +277,7 @@ def test_tampered_internal_token_is_refused():
 
 def test_unknown_server_cannot_be_signed_for():
     with pytest.raises(ValueError):
-        internal_token.sign("market", advisor_id=A1, today=date.today())
+        internal_token.sign("crm", advisor_id=A1, today=date.today())
 
 
 # --- analytics -------------------------------------------------------------------------------------------

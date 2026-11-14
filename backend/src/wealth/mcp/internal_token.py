@@ -25,7 +25,7 @@ import jwt
 
 ISSUER = "advisoragent-backend"
 LIFETIME_SECONDS = 120
-SERVERS = ("portfolio", "analytics")
+SERVERS = ("portfolio", "analytics", "market")
 
 
 class InternalTokenError(Exception):
