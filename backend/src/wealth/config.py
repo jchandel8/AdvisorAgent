@@ -13,7 +13,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 
 from dotenv import find_dotenv, load_dotenv
 
-DEFAULT_MODEL = "claude-sonnet-5-5"
+from wealth.llm import DEFAULT_MODELS, PROVIDERS
 
 
 def _with_db_name(url: str, db_name: str) -> str:
@@ -25,8 +25,11 @@ def _with_db_name(url: str, db_name: str) -> str:
 class Settings:
     database_url: str
     test_database_url: str
+    llm_provider: str  # "anthropic" (API key, local) or "bedrock" (IAM, AWS); see wealth/llm.py
     anthropic_api_key: str | None
-    anthropic_model: str
+    anthropic_model: str  # the agent's model
+    guard_model: str  # the scope check's small model
+    bedrock_region: str | None
     data_anchor_date: date
     answer_cache_enabled: bool
     answer_cache_ttl_hours: float
@@ -67,11 +70,23 @@ def get_settings() -> Settings:
     anchor_raw = os.environ.get("DATA_ANCHOR_DATE", "").strip()
     anchor = date.fromisoformat(anchor_raw) if anchor_raw else date.today()
 
+    provider = os.environ.get("LLM_PROVIDER", "").strip().lower() or "anthropic"
+    if provider not in PROVIDERS:
+        raise RuntimeError(f"LLM_PROVIDER must be one of {PROVIDERS}, not {provider!r}")
+
     return Settings(
         database_url=database_url,
         test_database_url=test_url,
+        llm_provider=provider,
         anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY") or None,
-        anthropic_model=os.environ.get("ANTHROPIC_MODEL", "").strip() or DEFAULT_MODEL,
+        anthropic_model=os.environ.get("ANTHROPIC_MODEL", "").strip() or DEFAULT_MODELS[provider][0],
+        guard_model=os.environ.get("GUARD_MODEL", "").strip() or DEFAULT_MODELS[provider][1],
+        bedrock_region=(
+            os.environ.get("BEDROCK_REGION", "").strip()
+            or os.environ.get("AWS_REGION", "").strip()
+            or os.environ.get("AWS_DEFAULT_REGION", "").strip()
+            or None
+        ),
         data_anchor_date=anchor,
         answer_cache_enabled=os.environ.get("ANSWER_CACHE_ENABLED", "true").strip().lower() != "false",
         answer_cache_ttl_hours=float(os.environ.get("ANSWER_CACHE_TTL_HOURS", "").strip() or 24),

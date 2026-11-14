@@ -15,7 +15,6 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
-import anthropic
 import psycopg
 from fastapi import Depends, Header, HTTPException, status
 
@@ -23,6 +22,7 @@ from wealth.access import Viewer
 from wealth.api.cognito import NotSetUp, TokenError, signing_key, verify_access_token
 from wealth.config import get_settings, running_on_aws
 from wealth.db import connection, read_only
+from wealth.llm import make_client
 
 DEMO_HEADER = re.compile(r"^(advisor|client|admin):([1-9][0-9]{0,8})$")
 
@@ -45,12 +45,13 @@ def get_agent_conn() -> psycopg.Connection | None:
 
 
 @lru_cache(maxsize=1)
-def _anthropic_client() -> anthropic.Anthropic:
-    return anthropic.Anthropic(api_key=get_settings().anthropic_api_key)
+def _llm_client() -> Any:
+    return make_client(get_settings())
 
 
 def get_llm_client() -> Any:
-    return _anthropic_client()
+    """Anthropic API locally, Amazon Bedrock on AWS (LLM_PROVIDER). Tests override it with a fake."""
+    return _llm_client()
 
 
 TABLE_FOR = {"advisor": "advisors", "client": "clients", "admin": "admins"}

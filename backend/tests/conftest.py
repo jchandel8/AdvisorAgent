@@ -54,10 +54,20 @@ def conn(test_db_url: str) -> Iterator[psycopg.Connection]:
 
 @pytest.fixture(autouse=True)
 def isolated_auth_settings(monkeypatch):
-    """Tests never depend on the developer's .env sign-in settings: demo mode, no Cognito, unless a test
+    """Tests never depend on the developer's .env sign-in or model settings: demo mode, no Cognito, the
+    Anthropic provider with default models, unless a test
     sets its own. Values are set to empty (not removed) so .env can't refill them."""
     monkeypatch.setenv("AUTH_MODE", "demo")
-    for name in ("COGNITO_REGION", "COGNITO_USER_POOL_ID", "COGNITO_CLIENT_ID", "COGNITO_DOMAIN"):
+    for name in (
+        "COGNITO_REGION",
+        "COGNITO_USER_POOL_ID",
+        "COGNITO_CLIENT_ID",
+        "COGNITO_DOMAIN",
+        "LLM_PROVIDER",
+        "ANTHROPIC_MODEL",
+        "GUARD_MODEL",
+        "BEDROCK_REGION",
+    ):
         monkeypatch.setenv(name, "")
     get_settings.cache_clear()
     yield
