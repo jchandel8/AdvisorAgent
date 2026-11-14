@@ -35,3 +35,9 @@ variable "guard_model" {
   type        = string
   default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 }
+
+variable "finalyst_model" {
+  description = "The AI Finalyst's writer on Bedrock (e.g. an Opus inference profile the account can use). Empty: the agent model."
+  type        = string
+  default     = ""
+}

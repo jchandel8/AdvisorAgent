@@ -23,9 +23,15 @@ data "aws_secretsmanager_secret" "demo_password" {
   name = "advisoragent/demo-password"
 }
 
+data "aws_secretsmanager_secret" "tavily_api_key" {
+  name = "advisoragent/tavily-api-key"
+}
+
 locals {
   # Inference profile "us.anthropic.claude-x" routes to foundation model "anthropic.claude-x" in US regions.
-  model_profiles = distinct([var.anthropic_model, var.guard_model])
+  # The AI Finalyst writes with var.finalyst_model if set (an Opus profile the account can use), else the agent model.
+  finalyst_model = var.finalyst_model != "" ? var.finalyst_model : var.anthropic_model
+  model_profiles = distinct([var.anthropic_model, var.guard_model, local.finalyst_model])
   profile_arns = [
     for m in local.model_profiles : "arn:aws:bedrock:${var.region}:${data.aws_caller_identity.current.account_id}:inference-profile/${m}"
   ]
@@ -33,7 +39,11 @@ locals {
     for m in local.model_profiles : "arn:aws:bedrock:*::foundation-model/${replace(m, "/^(us|global)\\./", "")}"
   ]
   # Secrets the container receives at start. No Claude API key: Bedrock is called with the task role.
-  secret_arns = [data.aws_secretsmanager_secret.demo_password.arn, aws_db_instance.db.master_user_secret[0].secret_arn]
+  secret_arns = [
+    data.aws_secretsmanager_secret.demo_password.arn,
+    data.aws_secretsmanager_secret.tavily_api_key.arn,
+    aws_db_instance.db.master_user_secret[0].secret_arn,
+  ]
 }
 
 # --- Database --------------------------------------------------------------------------------------
@@ -326,6 +336,14 @@ resource "aws_ecs_express_gateway_service" "app" {
       value = var.guard_model
     }
     environment {
+      name  = "FINALYST_MODEL"
+      value = local.finalyst_model
+    }
+    environment {
+      name  = "RESEARCH_MODEL"
+      value = var.anthropic_model
+    }
+    environment {
       name  = "DB_HOST"
       value = aws_db_instance.db.address
     }
@@ -345,6 +363,10 @@ resource "aws_ecs_express_gateway_service" "app" {
     secret {
       name       = "DEMO_PASSWORD"
       value_from = data.aws_secretsmanager_secret.demo_password.arn
+    }
+    secret {
+      name       = "TAVILY_API_KEY"
+      value_from = data.aws_secretsmanager_secret.tavily_api_key.arn
     }
   }
 

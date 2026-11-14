@@ -29,3 +29,12 @@ resource "aws_secretsmanager_secret" "demo_password" {
   description             = "Shared password for the demo logins"
   recovery_window_in_days = 0
 }
+
+# News search for the AI Finalyst's Market MCP server. Container only; the owner sets the value once with
+#   aws secretsmanager put-secret-value --secret-id advisoragent/tavily-api-key --secret-string '...'
+# Only public news queries are sent with it (the app refuses queries containing client data).
+resource "aws_secretsmanager_secret" "tavily_api_key" {
+  name                    = "advisoragent/tavily-api-key"
+  description             = "Tavily API key for the AI Finalyst's news search"
+  recovery_window_in_days = 0
+}
