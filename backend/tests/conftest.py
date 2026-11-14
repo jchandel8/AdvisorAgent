@@ -71,6 +71,8 @@ def isolated_auth_settings(monkeypatch):
         "DOCUMENTS_BUCKET",
         "S3_ENDPOINT_URL",
         "TAVILY_API_KEY",
+        "FINALYST_MODEL",
+        "RESEARCH_MODEL",
     ):
         monkeypatch.setenv(name, "")
     get_settings.cache_clear()

@@ -188,7 +188,7 @@ def _calls_for(tool_name):
         return [{}]
     if tool_name == "find_reviews_due":
         return [{"within_days": 365}]
-    if tool_name == "get_accounts":
+    if tool_name in ("get_accounts", "get_client_profile"):
         return [{"client_id": c} for c in ALL_CLIENTS]
     calls = [{"account_id": a} for a in ALL_ACCOUNTS] + [{"client_id": c} for c in ALL_CLIENTS]
     if tool_name == "search_documents":  # every word in the fixture documents, unscoped and scoped
@@ -232,6 +232,7 @@ def test_tool_definitions_are_complete():
         "get_performance",
         "find_reviews_due",
         "search_documents",  # step 6b
+        "get_client_profile",  # step 7b
     }
 
 
@@ -365,3 +366,11 @@ def test_focus_still_answers_about_the_selected_client(conn):
 def test_no_focus_is_unchanged(conn):
     clients = focused(conn, A2, None, "get_my_clients")["clients"]
     assert {c["client_id"] for c in clients} == {C1, C2, C3, C4}
+
+
+def test_client_profile_shows_target_and_current_mix_of_shared_accounts_only(conn):
+    out = run(conn, A1, "get_client_profile", client_id=C1)
+    assert out["target_allocation_pct"] == {"cash": 5.0, "equity": 60.0, "fixed_income": 35.0}
+    assert out["current_allocation_pct"] == {"equity": 80.0, "fixed_income": 20.0}  # X only, not Y
+    assert out["accessible_account_count"] == 1
+    assert run(conn, A1, "get_client_profile", client_id=C4) == NOT_FOUND

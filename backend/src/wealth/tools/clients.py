@@ -1,11 +1,11 @@
-"""Client-level tools: get_my_clients, find_reviews_due."""
+"""Client-level tools: get_my_clients, find_reviews_due, get_client_profile."""
 
 from __future__ import annotations
 
 from datetime import timedelta
 
-from wealth.access import SNAPSHOT, VISIBLE, ToolContext
-from wealth.tools.schemas import NoInput, ReviewsInput
+from wealth.access import NOT_FOUND, SNAPSHOT, VISIBLE, ToolContext
+from wealth.tools.schemas import ClientInput, NoInput, ReviewsInput
 
 # One row per client reachable through a visible account, with totals over ONLY those accounts.
 # A joint account counts in full for each of its clients (it is part of each client's portfolio).
@@ -53,3 +53,39 @@ def find_reviews_due(ctx: ToolContext, params: ReviewsInput) -> dict:
     for r in rows:
         r["overdue"] = r["days_until_review"] < 0
     return {"today": ctx.today, "within_days": params.within_days, "client_count": len(rows), "clients": rows}
+
+
+def get_client_profile(ctx: ToolContext, params: ClientInput) -> dict:
+    """Risk profile, target allocation (percent) and review date of a client the advisor shares an account with,
+    plus the current asset-class mix of the accessible accounts, so drift from target can be measured."""
+    rows = ctx.conn.execute(
+        _CLIENT_ROLLUP
+        + """ WHERE c.id = %(client_id)s
+        GROUP BY c.id""",
+        {**ctx.viewer_params(), "as_of": ctx.today, "client_id": params.client_id},
+    ).fetchall()
+    if not rows:
+        return NOT_FOUND
+    profile = rows[0]
+    target = ctx.conn.execute(
+        "SELECT target_allocation FROM clients WHERE id = %s", (params.client_id,)
+    ).fetchone()["target_allocation"]
+    mix = ctx.conn.execute(
+        f"""WITH {VISIBLE}, {SNAPSHOT}
+        SELECT s.asset_class, round(sum(h.quantity * h.price), 2) AS market_value
+        FROM visible v
+        JOIN account_access ca ON ca.account_id = v.account_id AND ca.client_id = %(client_id)s
+        JOIN snapshot sn ON sn.account_id = v.account_id
+        JOIN holdings h ON h.account_id = v.account_id AND h.as_of_date = sn.as_of_date
+        JOIN securities s ON s.symbol = h.symbol
+        GROUP BY s.asset_class ORDER BY s.asset_class""",
+        {**ctx.viewer_params(), "as_of": ctx.today, "client_id": params.client_id},
+    ).fetchall()
+    total = sum(float(m["market_value"]) for m in mix) or 1.0
+    return {
+        **profile,
+        "target_allocation_pct": {k: round(float(v) * 100, 2) for k, v in sorted(target.items())},
+        "current_allocation_pct": {
+            m["asset_class"]: round(float(m["market_value"]) * 100 / total, 2) for m in mix
+        },
+    }

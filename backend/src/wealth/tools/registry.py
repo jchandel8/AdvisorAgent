@@ -23,7 +23,7 @@ from pydantic import BaseModel, ValidationError
 from wealth.access import ToolContext, Viewer
 from wealth.db import read_only
 from wealth.tools.accounts import get_accounts
-from wealth.tools.clients import find_reviews_due, get_my_clients
+from wealth.tools.clients import find_reviews_due, get_client_profile, get_my_clients
 from wealth.tools.documents import search_documents
 from wealth.tools.holdings import get_holdings
 from wealth.tools.performance import get_performance
@@ -93,6 +93,13 @@ TOOLS: dict[str, Tool] = {
             "(overdue reviews are included and flagged).",
             ReviewsInput,
             find_reviews_due,
+        ),
+        Tool(
+            "get_client_profile",
+            "One client's risk profile, target allocation and current asset-class allocation (percent, over the "
+            "accounts you can access), and next review date. Use it to measure drift from target.",
+            ClientInput,
+            get_client_profile,
         ),
         Tool(
             "search_documents",

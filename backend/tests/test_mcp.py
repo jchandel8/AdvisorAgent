@@ -73,6 +73,7 @@ SAMPLE_INPUTS = {
     "get_performance": {"client_id": C1},
     "find_reviews_due": {"within_days": 90},
     "search_documents": {"query": "college savings"},
+    "get_client_profile": {"client_id": C1},
 }
 
 

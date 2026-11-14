@@ -21,6 +21,11 @@ def _with_db_name(url: str, db_name: str) -> str:
     return urlunsplit(parts._replace(path=f"/{db_name}"))
 
 
+# The Finalyst writes with Opus on the Claude API. On Bedrock it uses FINALYST_MODEL, else the agent model
+# (check which Opus the AWS account can use before setting it).
+FINALYST_DEFAULT = "claude-opus-5-5"
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str
@@ -29,6 +34,10 @@ class Settings:
     anthropic_api_key: str | None
     anthropic_model: str  # the agent's model
     guard_model: str  # the scope check's small model
+    finalyst_model: str  # the AI Finalyst's writer (Opus locally); FINALYST_MODEL
+    research_model: str  # the Finalyst's research agent and reviewer (the agent model by default)
+    finalyst_per_hour: int
+    finalyst_per_day: int
     bedrock_region: str | None
     data_anchor_date: date
     answer_cache_enabled: bool
@@ -86,6 +95,14 @@ def get_settings() -> Settings:
         anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY") or None,
         anthropic_model=os.environ.get("ANTHROPIC_MODEL", "").strip() or DEFAULT_MODELS[provider][0],
         guard_model=os.environ.get("GUARD_MODEL", "").strip() or DEFAULT_MODELS[provider][1],
+        finalyst_model=os.environ.get("FINALYST_MODEL", "").strip()
+        or (FINALYST_DEFAULT if provider == "anthropic" else os.environ.get("ANTHROPIC_MODEL", "").strip())
+        or DEFAULT_MODELS[provider][0],
+        research_model=os.environ.get("RESEARCH_MODEL", "").strip()
+        or os.environ.get("ANTHROPIC_MODEL", "").strip()
+        or DEFAULT_MODELS[provider][0],
+        finalyst_per_hour=int(os.environ.get("FINALYST_PER_HOUR", "").strip() or 5),
+        finalyst_per_day=int(os.environ.get("FINALYST_PER_DAY", "").strip() or 20),
         bedrock_region=(
             os.environ.get("BEDROCK_REGION", "").strip()
             or os.environ.get("AWS_REGION", "").strip()

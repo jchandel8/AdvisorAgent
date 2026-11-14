@@ -14,6 +14,10 @@ import {
   UserDetail,
   UserKind,
   AgentRunDetail,
+  BriefType,
+  FinalystBrief,
+  FinalystBriefSummary,
+  FinalystStart,
   AgentRunFilters,
   AgentRunPage,
   AssistantEvent,
@@ -238,6 +242,23 @@ export class Api {
         outcome: f.outcome,
       }),
     });
+  }
+  /** Starts a brief (or returns today's identical one). The run continues on the server; poll finalystBrief. */
+  startBrief(body: {
+    client_id: number;
+    brief_type: BriefType;
+    note?: string | null;
+    refresh?: boolean;
+  }): Observable<FinalystStart> {
+    return this.http.post<FinalystStart>('/api/advisor/finalyst/briefs', body);
+  }
+  finalystBriefs(clientId: number | null = null): Observable<{ briefs: FinalystBriefSummary[] }> {
+    return this.http.get<{ briefs: FinalystBriefSummary[] }>('/api/advisor/finalyst/briefs', {
+      params: this.params({ client_id: clientId }),
+    });
+  }
+  finalystBrief(id: number): Observable<FinalystBrief> {
+    return this.http.get<FinalystBrief>(`/api/advisor/finalyst/briefs/${id}`);
   }
   /** Opening a run is recorded in the audit log (it shows client data). */
   agentRun(id: number): Observable<AgentRunDetail> {

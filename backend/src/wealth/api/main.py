@@ -12,7 +12,14 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
-from wealth.api import routes_admin, routes_advisor, routes_client, routes_common, routes_documents
+from wealth.api import (
+    routes_admin,
+    routes_advisor,
+    routes_client,
+    routes_common,
+    routes_documents,
+    routes_finalyst,
+)
 from wealth.config import get_settings, running_on_aws
 from wealth.db import close_pools
 from wealth.mcp import analytics, market, portfolio
@@ -49,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_advisor.router)
     app.include_router(routes_admin.router)
     app.include_router(routes_documents.router)
+    app.include_router(routes_finalyst.router)
     # MCP servers for the agents. Only reachable from inside this process (see wealth/mcp/guard.py).
     app.state.mcp_apps = []
     for path, module in (

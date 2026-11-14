@@ -471,3 +471,71 @@ export interface UploadAccount {
   role: string;
   clients: string | null;
 }
+
+// ---- AI Finalyst (advisor portal) -----------------------------------------------------------------------
+
+export type BriefType = 'portfolio_review' | 'market_impact' | 'rebalancing' | 'meeting_prep';
+
+export interface BriefEvidence {
+  source: 'facts' | 'analytics' | 'news' | 'documents';
+  detail: string;
+  url: string;
+}
+
+export interface BriefSuggestion {
+  title: string;
+  rationale: string;
+  evidence: BriefEvidence[];
+  risks: string;
+  confidence: 'low' | 'medium' | 'high';
+}
+
+export interface BriefContent {
+  summary: string;
+  client_snapshot: string;
+  suggestions: BriefSuggestion[];
+  questions_for_meeting: string[];
+  watch_list: string[];
+  sources: { title: string; url: string; source: string; published: string | null }[];
+  disclaimer: string;
+}
+
+export interface BriefReview {
+  approved: boolean;
+  issues: string[];
+  unsupported_figures: string[];
+  revised: boolean;
+}
+
+export interface FinalystBrief {
+  id: number;
+  client_id: number;
+  client_name: string;
+  brief_type: BriefType;
+  note: string | null;
+  status: 'running' | 'done' | 'failed';
+  stage: string | null;
+  created_at: string;
+  finished_at: string | null;
+  error: string | null;
+  brief: BriefContent | null;
+  review: BriefReview | null;
+}
+
+export interface FinalystBriefSummary {
+  id: number;
+  client_id: number;
+  client_name: string;
+  brief_type: BriefType;
+  note: string | null;
+  status: 'running' | 'done' | 'failed';
+  stage: string | null;
+  created_at: string;
+  summary: string | null;
+}
+
+export interface FinalystStart {
+  id: number;
+  status: 'running' | 'done';
+  reused: boolean;
+}
