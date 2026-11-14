@@ -95,6 +95,7 @@
   svg .band-adm { fill: var(--admin); }
   svg .edge { fill: none; stroke: var(--line); stroke-width: 1.5; }
   svg .edge.dash { stroke-dasharray: 4 4; }
+  svg .gap { fill: none; stroke: var(--surface); stroke-width: 7; }
   svg .arrowhead { fill: var(--line); }
   svg .node.on .box, svg .node.on .box-ai { stroke: var(--packet, var(--ink)); stroke-width: 2.5; }
   svg .edge.on { stroke: var(--packet, var(--ink)); stroke-width: 2.5; }
@@ -133,6 +134,18 @@
   .legend span { display: inline-flex; align-items: center; gap: 8px; }
   .sw { width: 22px; height: 12px; border-radius: 3px; display: inline-block; }
 
+  .ref { display: grid; gap: 28px; }
+  .ref-group { display: grid; gap: 12px; }
+  .ref-group > p { max-width: 75ch; color: var(--muted); }
+  .ref td:first-child { white-space: normal; min-width: 11rem; }
+  .ref td code, .ref th code { white-space: nowrap; }
+  .who { display: inline-block; font-size: 0.8125rem; font-weight: 600; padding: 0 8px; border-radius: 999px; border: 1px solid currentColor; }
+  .who.adv { color: var(--advisor); } .who.cli { color: var(--client); } .who.adm { color: var(--admin); } .who.any { color: var(--muted); }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; }
+  .toc a { color: var(--ink); text-decoration: none; border: 1px solid var(--rule); background: var(--surface); border-radius: 999px; padding: 8px 14px; min-height: 44px; display: inline-flex; align-items: center; }
+  .toc a:hover { background: var(--sunk); }
+  .note { border-left: 3px solid var(--line); padding: 4px 0 4px 14px; color: var(--muted); max-width: 75ch; }
+
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -146,7 +159,9 @@
       reads only accounts the signed-in person has an <code>account_access</code> row for. The <strong>AI agent</strong>
       (ochre) lives inside the backend: it asks for data through six read-only tools, never sees who it acts for, and
       never touches the database directly. <strong>Admins</strong> change who can see what; every change is written to
-      an audit log in the same transaction.
+      an audit log in the same transaction. <strong>Documents</strong> are shared per account: anyone with access to an
+      account (its advisors and its owners) sees, opens and downloads its documents. Files sit in a private S3 bucket and
+      are streamed through the backend after the same access check, and every open is recorded.
     </p>
   </header>
 
@@ -157,6 +172,7 @@
         <button class="tab" type="button" data-scenario="client"><span class="dot" style="background: var(--client)"></span>Client signs in and opens Holdings</button>
         <button class="tab" type="button" data-scenario="ask"><span class="dot" style="background: var(--advisor)"></span>Advisor asks the assistant</button>
         <button class="tab" type="button" data-scenario="blocked"><span class="dot" style="background: var(--blocked)"></span>Off-topic question is blocked</button>
+        <button class="tab" type="button" data-scenario="share"><span class="dot" style="background: var(--client)"></span>Client shares a document</button>
         <button class="tab" type="button" data-scenario="grant"><span class="dot" style="background: var(--admin)"></span>Admin grants access</button>
       </div>
       <div class="btns">
@@ -166,8 +182,8 @@
     </div>
 
     <figure class="canvas">
-      <svg viewBox="0 0 1200 660" role="img" id="diagram"
-        aria-label="Advisor, client and admin portals run in the browser as one Angular app. People sign in on Amazon Cognito's hosted page; the app sends the token with every API call. In the FastAPI backend, a sign-in check routes requests to the assistant endpoint, the admin endpoints or the portal endpoints. The AI agent zone holds limits and audit log, a scope check using Claude Haiku 5.5, the agent loop using Claude Sonnet 5.5, and six read-only tools. Portal endpoints and tools read Postgres only through the access layer. Admin endpoints write grants and the audit log to Postgres in one transaction.">
+      <svg viewBox="0 0 1200 770" role="img" id="diagram"
+        aria-label="Advisor, client and admin portals run in the browser as one Angular app. People sign in on Amazon Cognito's hosted page; the app sends the token with every API call. In the FastAPI backend, a sign-in check routes requests to the assistant endpoint, the admin endpoints or the portal endpoints. The AI agent zone holds limits and audit log, a scope check using Claude Haiku 5.5, the agent loop using Claude Sonnet 5.5, and six read-only tools. Portal endpoints and tools read Postgres only through the access layer. Admin endpoints write grants and the audit log to Postgres in one transaction. Document endpoints check access through the access layer, keep document rows and open events in Postgres, and keep the files in S3 storage.">
         <defs>
           <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0 0 L10 5 L0 10 z" class="arrowhead" />
@@ -188,18 +204,22 @@
           <path id="pL" class="edge" d="M315 250 L315 122" marker-end="url(#ah)" />
           <path id="p3" class="edge" d="M390 290 C420 290 420 105 460 105" marker-end="url(#ah)" />
           <path id="p4" class="edge" d="M545 130 L545 168" marker-end="url(#ah)" />
-          <path id="p5" class="edge" d="M460 122 L446 122 L446 413 L460 413" marker-end="url(#ah)" />
-          <path id="pX" class="edge" d="M460 122 L446 122 L446 295 L460 295" marker-end="url(#ah)" />
-          <path id="p6" class="edge" d="M545 438 L545 478" marker-end="url(#ah)" />
-          <path id="pD" class="edge" d="M460 308 L438 308 L438 615 L980 615" marker-end="url(#ah)" />
+          <path id="p5" class="edge" d="M460 122 L446 122 L446 355 L460 355" marker-end="url(#ah)" />
+          <path id="pDoc" class="edge" d="M460 122 L446 122 L446 435 L460 435" marker-end="url(#ah)" />
+          <path id="pX" class="edge" d="M460 122 L446 122 L446 275 L460 275" marker-end="url(#ah)" />
+          <path id="p6" class="edge" d="M630 355 L650 355 L650 500" marker-end="url(#ah)" />
+          <path id="pDA" class="edge" d="M545 460 L545 500" marker-end="url(#ah)" />
+          <path id="pD" class="edge" d="M460 288 L438 288 L438 618 L980 618" marker-end="url(#ah)" />
           <path id="p7" class="edge" d="M630 193 C660 193 660 134 690 134" marker-end="url(#ah)" />
           <path id="p8" class="edge" d="M800 158 L800 174" marker-end="url(#ah)" />
           <path id="p9" class="edge" d="M910 196 C945 196 945 170 980 170" marker-end="url(#ah)" />
           <path id="p10" class="edge" d="M800 222 L800 238" marker-end="url(#ah)" />
           <path id="p11" class="edge" d="M910 262 C945 262 945 232 980 232" marker-end="url(#ah)" />
           <path id="p12" class="edge" d="M800 292 L800 312" marker-end="url(#ah)" />
-          <path id="p13" class="edge" d="M800 368 L800 478" marker-end="url(#ah)" />
-          <path id="p14" class="edge" d="M920 516 C950 516 950 500 980 500" marker-end="url(#ah)" />
+          <path id="p13" class="edge" d="M800 368 L800 500" marker-end="url(#ah)" />
+          <path id="p14" class="edge" d="M920 538 C950 538 950 520 980 520" marker-end="url(#ah)" />
+          <path class="gap" d="M955 590 L955 640" />
+          <path id="pS3" class="edge" d="M920 566 L955 566 L955 705 L980 705" marker-end="url(#ah)" />
           <path id="p16" class="edge" d="M690 268 C655 268 655 208 630 208" marker-end="url(#ah)" />
           <path id="p17" class="edge dash" d="M910 140 C960 140 960 440 980 450" marker-end="url(#ah)" />
         </g>
@@ -211,9 +231,10 @@
         <text class="lbl" x="953" y="226" text-anchor="middle">tool use</text>
         <text class="lbl" x="664" y="236" text-anchor="end">answer</text>
         <text class="lbl" x="808" y="430">tool calls</text>
-        <text class="lbl" x="952" y="538" text-anchor="middle">SQL</text>
+        <text class="lbl" x="952" y="514" text-anchor="middle">SQL</text>
+        <text class="lbl" x="948" y="690" text-anchor="end">file by key</text>
         <text class="lbl" x="966" y="380" text-anchor="end">events</text>
-        <text class="lbl" x="700" y="608" text-anchor="middle">grant or revoke + audit row, one transaction</text>
+        <text class="lbl" x="700" y="610" text-anchor="middle">grant or revoke + audit row, one transaction</text>
 
         <!-- Browsers -->
         <g class="node" id="n_adv">
@@ -262,20 +283,25 @@
           <text class="s" x="474" y="206">loads/saves conversation</text>
         </g>
         <g class="node" id="n_admin">
-          <rect class="box" x="460" y="270" width="170" height="50" rx="8" />
-          <text class="t" x="474" y="291">Admin endpoints</text>
-          <text class="s" x="474" y="308">users, accounts, access</text>
+          <rect class="box" x="460" y="250" width="170" height="50" rx="8" />
+          <text class="t" x="474" y="271">Admin endpoints</text>
+          <text class="s" x="474" y="288">users, accounts, access</text>
         </g>
         <g class="node" id="n_portal">
-          <rect class="box" x="460" y="388" width="170" height="50" rx="8" />
-          <text class="t" x="474" y="409">Portal endpoints</text>
-          <text class="s" x="474" y="426">accounts, holdings, gains…</text>
+          <rect class="box" x="460" y="330" width="170" height="50" rx="8" />
+          <text class="t" x="474" y="351">Portal endpoints</text>
+          <text class="s" x="474" y="368">accounts, holdings, gains…</text>
+        </g>
+        <g class="node" id="n_docs">
+          <rect class="box" x="460" y="410" width="170" height="50" rx="8" />
+          <text class="t" x="474" y="431">Document endpoints</text>
+          <text class="s" x="474" y="448">upload, list, open, delete</text>
         </g>
         <g class="node" id="n_access">
-          <rect class="box" x="460" y="478" width="460" height="76" rx="10" />
-          <text class="t" x="476" y="502">Access layer · “visible accounts”</text>
-          <text class="s" x="476" y="521">every read joins account_access for the signed-in person</text>
-          <text class="s" x="476" y="538">(and the selected client, when one is chosen in the assistant)</text>
+          <rect class="box" x="460" y="500" width="460" height="76" rx="10" />
+          <text class="t" x="476" y="524">Access layer · “visible accounts”</text>
+          <text class="s" x="476" y="543">every read joins account_access for the signed-in person</text>
+          <text class="s" x="476" y="560">(selected client in the assistant; documents of open accounts only)</text>
         </g>
 
         <g class="node" id="n_limits">
@@ -325,6 +351,15 @@
           <text class="s" x="996" y="567">agent_conversations</text>
           <text class="s" x="996" y="584">answer_cache</text>
           <text class="s" x="996" y="601">assistant_events</text>
+          <text class="s" x="996" y="621">documents, document_events</text>
+        </g>
+
+        <g class="node" id="n_s3">
+          <rect class="box" x="980" y="665" width="200" height="84" rx="10" style="stroke: var(--aws)" />
+          <text class="t" x="996" y="690">File storage</text>
+          <text class="s" x="996" y="708">private S3 bucket on AWS,</text>
+          <text class="s" x="996" y="722">S3-compatible server locally</text>
+          <text class="s" x="996" y="738">documents/{account}/{uuid}</text>
         </g>
 
         <g id="packet" aria-hidden="true" style="visibility:hidden">
@@ -352,7 +387,7 @@
     <h2 id="aws-title">How it runs on AWS</h2>
     <figure class="canvas">
       <svg viewBox="0 0 1200 380" role="img"
-        aria-label="GitHub Actions pushes the image to ECR and applies Terraform. Browsers sign in with Cognito and reach the app through the ECS Express load balancer over HTTPS. One container serves the API, the AI agent and the Angular app; it reads secrets from Secrets Manager at start, talks to RDS Postgres inside the default VPC, and calls Claude on Amazon Bedrock with its IAM role.">
+        aria-label="GitHub Actions pushes the image to ECR and applies Terraform. Browsers sign in with Cognito and reach the app through the ECS Express load balancer over HTTPS. One container serves the API, the AI agent and the Angular app; it reads secrets from Secrets Manager at start, talks to RDS Postgres inside the default VPC, calls Claude on Amazon Bedrock with its IAM role, and reads and writes document files in a private S3 bucket.">
         <defs>
           <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0 0 L10 5 L0 10 z" class="arrowhead" />
@@ -370,6 +405,7 @@
         <path class="edge" d="M810 82 L700 172" marker-end="url(#ah2)" />
         <path class="edge" d="M700 210 L750 210" marker-end="url(#ah2)" />
         <path class="edge" d="M585 245 L585 300" marker-end="url(#ah2)" />
+        <path class="edge" d="M690 245 L790 300" marker-end="url(#ah2)" />
 
         <text class="lbl" x="330" y="42" text-anchor="middle">push image</text>
         <text class="lbl" x="215" y="192" text-anchor="middle">HTTPS</text>
@@ -379,6 +415,7 @@
         <text class="lbl" x="770" y="116">inject at start</text>
         <text class="lbl" x="725" y="202" text-anchor="middle">SQL</text>
         <text class="lbl" x="593" y="280">Claude API</text>
+        <text class="lbl" x="752" y="266">files</text>
 
         <g><rect class="box" x="20" y="20" width="170" height="64" rx="10" />
           <text class="t" x="34" y="44">GitHub Actions</text>
@@ -392,7 +429,7 @@
           <text class="s" x="484" y="62">image registry (kept on teardown)</text></g>
         <g><rect class="box-aws" x="720" y="20" width="250" height="62" rx="10" />
           <text class="t" x="734" y="44">Secrets Manager</text>
-          <text class="s" x="734" y="62">DB password, Anthropic key, demo password</text></g>
+          <text class="s" x="734" y="62">DB password, demo password</text></g>
         <g><rect class="box-aws" x="240" y="170" width="180" height="60" rx="10" />
           <text class="t" x="254" y="194">ECS Express</text>
           <text class="s" x="254" y="212">load balancer, HTTPS URL</text></g>
@@ -411,11 +448,15 @@
         <g><rect class="box-aws" x="470" y="300" width="230" height="60" rx="10" />
           <text class="t" x="484" y="324">Amazon Bedrock</text>
           <text class="s" x="484" y="342">Haiku 4.5 and Sonnet 4.6, IAM role</text></g>
+        <g><rect class="box-aws" x="750" y="300" width="210" height="60" rx="10" />
+          <text class="t" x="764" y="324">S3 documents bucket</text>
+          <text class="s" x="764" y="342">private, encrypted, HTTPS only</text></g>
       </svg>
     </figure>
     <figcaption class="cap">
-      Tear down deletes the VPC contents shown inside the dashed box (database, service, load balancer). ECR,
-      Secrets Manager and Cognito stay, so the next Deploy is about 15 minutes and re-seeds the same demo data.
+      Tear down deletes the VPC contents shown inside the dashed box (database, service, load balancer) and the
+      documents bucket with every uploaded file. ECR, Secrets Manager and Cognito stay, so the next Deploy is about
+      15 minutes and re-seeds the same demo data.
     </figcaption>
   </section>
 
@@ -483,15 +524,15 @@
     <div class="grid">
       <div class="card">
         <h3 style="color: var(--client)">Client portal</h3>
-        <p>Dashboard, holdings, transactions and gains, performance, profile. Only the client's own accounts; joint accounts appear for both owners.</p>
+        <p>Dashboard, holdings, transactions and gains, performance, documents, profile. Only the client's own accounts; joint accounts appear for both owners.</p>
       </div>
       <div class="card">
         <h3 style="color: var(--advisor)">Advisor portal</h3>
-        <p>Client book, a client's shared accounts, the AI assistant, profile. Only accounts the advisor has an access row for.</p>
+        <p>Client book, a client's shared accounts, the AI assistant, documents, profile. Only accounts the advisor has an access row for.</p>
       </div>
       <div class="card">
         <h3 style="color: var(--admin)">Admin portal</h3>
-        <p>Create users (database row and Cognito login together), create accounts, grant and revoke access, read the audit log and the assistant log. Admins manage access; they don't read portfolios.</p>
+        <p>Create users (database row and Cognito login together), create accounts, grant and revoke access, drill into any user or account, read documents (every open audited), and read the audit log and the assistant log. Admins manage access; they don't read portfolios.</p>
       </div>
     </div>
   </section>
@@ -511,8 +552,205 @@
           <tr><td>Secrets</td><td><code>.env</code>, never committed</td><td>Secrets Manager, injected when the container starts</td></tr>
           <tr><td>Deploy</td><td>n/a</td><td>GitHub Actions with keyless AWS access (OIDC); Terraform</td></tr>
           <tr><td>Claude</td><td>Anthropic API (key in <code>.env</code>)</td><td>Amazon Bedrock, called with the task's IAM role (no key)</td></tr>
+          <tr><td>Document files</td><td><code>s3</code> container (<code>adobe/s3mock</code>, S3-compatible), bucket <code>advisoragent-documents-local</code></td><td>Private S3 bucket <code>advisoragent-documents-&lt;account&gt;</code>, reached with the task's IAM role</td></tr>
         </tbody>
       </table>
+    </div>
+  </section>
+
+  <section class="ref" aria-labelledby="ref-title">
+    <div class="ref-group">
+      <h2 id="ref-title">Every piece in detail</h2>
+      <p class="lede" style="margin-top:0">
+        A reference for each part of the system: what it does, the rule it enforces, and the file it lives in.
+        Paths are relative to the repository root.
+      </p>
+      <nav class="toc" aria-label="Sections in this reference">
+        <a href="#r-signin">Sign-in</a><a href="#r-access">Access layer</a><a href="#r-api">API endpoints</a>
+        <a href="#r-agent">AI agent</a><a href="#r-docs">Document sharing</a><a href="#r-admin">Admin and audit</a>
+        <a href="#r-data">Data model</a><a href="#r-aws">AWS and delivery</a><a href="#r-tests">Tests</a>
+        <a href="#r-tradeoffs">Trade-offs</a>
+      </nav>
+    </div>
+
+    <div class="ref-group" id="r-signin">
+      <h3>Sign-in and identity</h3>
+      <p>Who you are comes only from a verified token. Nothing the browser or the model sends can change it.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th scope="col">Piece</th><th scope="col">What it does</th><th scope="col">Where</th></tr></thead>
+        <tbody>
+          <tr><td>Cognito user pool</td><td>Hosted sign-in page, OAuth code flow with PKCE. Three groups: <code>advisors</code>, <code>clients</code>, <code>admins</code>. Passwords never reach the app.</td><td><code>infra/persistent</code></td></tr>
+          <tr><td>Token check</td><td>On every request: RS256 signature against the pool's published keys (cached, refreshed on rotation); issuer is exactly this pool; not expired (30 s leeway); <code>token_use</code> is <code>access</code>; <code>client_id</code> is our app; exactly one of the three groups. Any failure is a 401.</td><td><code>backend/src/wealth/api/cognito.py</code></td></tr>
+          <tr><td>Identity mapping</td><td>The Cognito username is the database username; the group says which table (advisors, clients, admins). No custom attributes or Lambda triggers.</td><td><code>backend/src/wealth/api/deps.py</code></td></tr>
+          <tr><td>Role guards</td><td><code>require_advisor</code>, <code>require_client</code>, <code>require_admin</code>, and <code>require_person</code> (advisor or client, for documents). A wrong role is a 403.</td><td><code>deps.py</code>, <code>routes_documents.py</code></td></tr>
+          <tr><td>Demo sign-in (local only)</td><td>With <code>AUTH_MODE=demo</code>, a picker sends <code>X-Demo-User: advisor:2</code> in place of a token. Refused whenever the code sees it is on AWS (ECS metadata or AWS execution environment variables), whatever the setting says.</td><td><code>backend/src/wealth/config.py</code></td></tr>
+          <tr><td>Frontend</td><td>Asks <code>/api/auth/config</code> which mode to use and attaches the token to every call. If that call fails it assumes Cognito (fails closed). Route guards only hide screens; the backend enforces everything.</td><td><code>frontend/src/app/core</code></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="ref-group" id="r-access">
+      <h3>Access layer</h3>
+      <p>
+        One SQL fragment, <code>VISIBLE</code>, decides which accounts a person can see. Every portal query, every
+        document query and every agent tool starts with <code>WITH visible AS (...)</code> and joins through it.
+      </p>
+      <div class="tablewrap"><table>
+        <thead><tr><th scope="col">Rule</th><th scope="col">How it is enforced</th></tr></thead>
+        <tbody>
+          <tr><td>Only accounts you are on</td><td>An <code>account_access</code> row for this advisor or client, matched by <code>advisor_id</code> or <code>client_id</code> (never by name).</td></tr>
+          <tr><td>Only open accounts</td><td><code>accounts.close_date IS NULL</code>. Closing an account hides it, and its documents, everywhere.</td></tr>
+          <tr><td>Shared accounts only</td><td>An advisor sees a client only through accounts they share, so a client's other accounts never appear.</td></tr>
+          <tr><td>Selected client in the assistant</td><td><code>focus_client_id</code> narrows <code>visible</code> to that client's accounts. It is a hard filter in SQL, not a hint in the prompt, and it is checked again before every tool call.</td></tr>
+          <tr><td>No ID probing</td><td>An unknown ID and a forbidden ID get the same answer (404, or “not found” for tools).</td></tr>
+          <tr><td>Changes apply at once</td><td>Nothing is cached per person, so a grant or revoke shows on the next request.</td></tr>
+        </tbody>
+      </table></div>
+      <p>Where: <code>backend/src/wealth/access.py</code>; read-only transactions in <code>backend/src/wealth/db.py</code>.</p>
+    </div>
+
+    <div class="ref-group" id="r-api">
+      <h3>API endpoints (33)</h3>
+      <p>One FastAPI app serves all three portals. The role is checked first, then the access layer.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th scope="col">Endpoint</th><th scope="col">Who</th><th scope="col">What it returns or does</th></tr></thead>
+        <tbody>
+          <tr><td><code>GET /api/health</code></td><td><span class="who any">anyone</span></td><td>Liveness for the load balancer.</td></tr>
+          <tr><td><code>GET /api/auth/config</code></td><td><span class="who any">anyone</span></td><td>Sign-in mode and the public Cognito settings, so one build works locally and on AWS. No secrets.</td></tr>
+          <tr><td><code>GET /api/me</code></td><td><span class="who any">signed in</span></td><td>Who the token says you are, and your portal.</td></tr>
+          <tr><td><code>GET /api/demo/users</code></td><td><span class="who any">anyone</span></td><td>The demo users and what each can see (the picker locally, the “who to sign in as” page on AWS).</td></tr>
+          <tr><td><code>GET /api/client/profile · accounts · holdings · transactions · gains · performance</code></td><td><span class="who cli">client</span></td><td>Your own data only; the client ID comes from the token. Holdings, transactions and performance take an optional account filter. Gains: realized (average cost) and unrealized. Performance is weighted by market value.</td></tr>
+          <tr><td><code>GET /api/advisor/profile · clients · clients/{id}/accounts</code></td><td><span class="who adv">advisor</span></td><td>Client book with values over shared accounts only, and one client's shared accounts.</td></tr>
+          <tr><td><code>POST /api/advisor/assistant/messages</code></td><td><span class="who adv">advisor</span></td><td>Ask the AI agent (see below). Optional selected client, checked against the access layer.</td></tr>
+          <tr><td><code>GET /api/documents</code></td><td><span class="who adv">advisor</span> <span class="who cli">client</span></td><td>Documents on your visible accounts, with an account filter and search. Each has New, Mine and “opened by”.</td></tr>
+          <tr><td><code>GET /api/documents/new-count</code></td><td><span class="who adv">advisor</span> <span class="who cli">client</span></td><td>The number next to Documents in the menu.</td></tr>
+          <tr><td><code>GET /api/documents/accounts</code></td><td><span class="who adv">advisor</span> <span class="who cli">client</span></td><td>Accounts you may upload to (open, your access row, not as a viewer), with their owners.</td></tr>
+          <tr><td><code>POST /api/documents</code></td><td><span class="who adv">advisor</span> <span class="who cli">client</span></td><td>Upload (multipart): account, title, type, optional note, file.</td></tr>
+          <tr><td><code>GET /api/documents/{id}/file</code></td><td><span class="who adv">advisor</span> <span class="who cli">client</span></td><td>The file, inline (Open) or as an attachment (Download). Recorded.</td></tr>
+          <tr><td><code>DELETE /api/documents/{id}</code></td><td><span class="who adv">advisor</span> <span class="who cli">client</span></td><td>Uploader only. Hides the document; the row, file and history stay.</td></tr>
+          <tr><td><code>GET · POST /api/admin/users</code>, <code>GET /api/admin/users/{kind}/{id}</code></td><td><span class="who adm">admin</span></td><td>List and create users (database row and Cognito login together, undone if either fails); one user with every account and who else is on it.</td></tr>
+          <tr><td><code>GET · POST /api/admin/accounts</code>, <code>GET /api/admin/accounts/{id}</code>, <code>GET /api/admin/accounts/{id}/access</code></td><td><span class="who adm">admin</span></td><td>List and create accounts; one account with everyone on it and its documents (no portfolio values).</td></tr>
+          <tr><td><code>GET /api/admin/people</code>, <code>POST /api/admin/access</code>, <code>DELETE /api/admin/access/{id}</code></td><td><span class="who adm">admin</span></td><td>Find a person; grant or revoke access. Each change writes an audit row in the same transaction.</td></tr>
+          <tr><td><code>GET /api/admin/documents</code>, <code>/{id}</code>, <code>/{id}/content</code>, <code>/{id}/download</code></td><td><span class="who adm">admin</span></td><td>All documents (deleted ones marked); details with who has opened it; text preview; download. Preview and download are audited.</td></tr>
+          <tr><td><code>GET /api/admin/audit</code>, <code>GET /api/admin/assistant-events</code></td><td><span class="who adm">admin</span></td><td>The permission audit log and the assistant log, paged.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="ref-group" id="r-agent">
+      <h3>AI agent</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th scope="col">Piece</th><th scope="col">What it does</th><th scope="col">Where</th></tr></thead>
+        <tbody>
+          <tr><td>Limits</td><td>10 questions a minute and 100 a day per advisor (settings). Each request is reserved as a row in <code>assistant_events</code> and later given its outcome.</td><td><code>api/usage.py</code></td></tr>
+          <tr><td>Scope check</td><td>Haiku (5.5 locally, 4.5 on AWS) classifies the question with a strict JSON schema. Off-topic or manipulation gets a fixed reply. If the check fails, the request is refused (fails closed).</td><td><code>agent/guard.py</code></td></tr>
+          <tr><td>Agent loop</td><td>Manual tool-use loop with Sonnet (5.5 locally, 4.6 on AWS): at most 10 rounds and 16,000 output tokens. Tool input is validated with pydantic (<code>extra="forbid"</code>), then the tool runs with the advisor ID from the token. Model fallbacks are used with the Anthropic API only.</td><td><code>agent/loop.py</code>, <code>agent/prompts.py</code></td></tr>
+          <tr><td>Six tools</td><td><code>get_my_clients</code>, <code>get_accounts</code>, <code>get_holdings</code>, <code>get_transactions</code>, <code>get_performance</code>, <code>find_reviews_due</code>. Read-only transactions; all math in SQL; their schemas have no <code>advisor_id</code>.</td><td><code>tools/</code></td></tr>
+          <tr><td>Answer cache</td><td>The same question with the same scope reuses the answer until the earlier of 24 hours or local midnight.</td><td><code>agent/answer_cache.py</code></td></tr>
+          <tr><td>Conversations</td><td>Saved per advisor in <code>agent_conversations</code>, so a chat continues across page loads.</td><td><code>api/conversations.py</code></td></tr>
+          <tr><td>Provider switch</td><td><code>LLM_PROVIDER=anthropic</code> (API key, local) or <code>bedrock</code> (IAM role, AWS). Same code, one client factory.</td><td><code>llm.py</code></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="ref-group" id="r-docs">
+      <h3>Document sharing</h3>
+      <p>
+        A document always belongs to one account. Everyone with access to that account sees it, so an advisor and a
+        client, or two joint owners, can share files for each other to review. Seeded documents (statements, policy
+        statements, review notes) keep their text in the database; uploaded files go to S3.
+      </p>
+      <div class="tablewrap"><table>
+        <thead><tr><th scope="col">Rule or step</th><th scope="col">Detail</th></tr></thead>
+        <tbody>
+          <tr><td>Who sees a document</td><td>Anyone the access layer shows the account to: its advisors and its clients, on open accounts. A shared-one-account advisor never sees documents on the client's other accounts. Revoking access hides them on the next request.</td></tr>
+          <tr><td>Who may upload</td><td>Advisors and clients with a non-viewer access row on an open account. The account is a required field, and the list offers only those accounts. Admins don't upload.</td></tr>
+          <tr><td>File checks</td><td>At most 10 MB (413 if larger). Extension on an allow-list: PDF, TXT, PNG, JPG/JPEG, DOCX. The content must match: PDF and image signatures, valid UTF-8 text, a DOCX that is a real Word zip. Otherwise 422. The filename is cleaned before it is stored.</td></tr>
+          <tr><td>Saving</td><td>One transaction: the <code>documents</code> row (uploader, size, SHA-256, content type, original name, note) and an <code>upload</code> event. Then the file goes to <code>documents/{account_id}/{random UUID}</code>. If S3 fails, the request returns 502 and the transaction rolls back, so nothing half-saved remains.</td></tr>
+          <tr><td>Opening and downloading</td><td>The access check runs again, then the backend reads the file and streams it. There are no public or pre-signed S3 links. Headers: <code>Cache-Control: no-store</code>, <code>X-Content-Type-Options: nosniff</code>, <code>Content-Security-Policy: sandbox</code>, and a cleaned filename.</td></tr>
+          <tr><td>New, menu count, opened by</td><td>From <code>document_events</code>. A document is New for you if someone else uploaded it and you haven't opened or downloaded it. “Opened by” lists the other people who have. Seeded documents are never New.</td></tr>
+          <tr><td>Deleting</td><td>Only the uploader, with a confirm step. Sets <code>deleted_at</code>, so it disappears for everyone, but the row, the file and the history stay for the audit. Admins still see it, marked deleted.</td></tr>
+          <tr><td>Admins</td><td>See every document and who opened it, across all three portals. They can preview text and download any file. Each preview or download writes a <code>permission_audit</code> row in the same transaction.</td></tr>
+          <tr><td>Storage locally</td><td>An <code>s3</code> container (<code>adobe/s3mock</code>, S3-compatible) with the bucket created at start. The same boto3 code runs against it.</td></tr>
+          <tr><td>Storage on AWS</td><td>Bucket <code>advisoragent-documents-&lt;account id&gt;</code>: all public access blocked, owner-enforced, AES-256 encryption, a policy that denies non-HTTPS requests. The task role may only <code>s3:PutObject</code> and <code>s3:GetObject</code> under <code>documents/*</code> (no list, no delete). Teardown deletes the bucket and its files.</td></tr>
+        </tbody>
+      </table></div>
+      <p>Where: <code>backend/src/wealth/api/routes_documents.py</code>, <code>backend/src/wealth/storage.py</code>, migrations <code>006</code> and <code>007</code>, <code>frontend/src/app/pages/documents.ts</code>, <code>infra/app/main.tf</code>.</p>
+    </div>
+
+    <div class="ref-group" id="r-admin">
+      <h3>Admin portal and audit</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th scope="col">Screen</th><th scope="col">What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Users</td><td>List advisors, clients and admins. Create a user: the database row and the Cognito login together; if the login fails, the row is rolled back. Open a user to see every account they are on and who else is on it.</td></tr>
+          <tr><td>Accounts</td><td>List and create accounts. Open one to see everyone with access (who granted it, and when) and its documents.</td></tr>
+          <tr><td>Permissions</td><td>Grant or revoke. Checked: the account is open, the role fits the person type, no duplicate.</td></tr>
+          <tr><td>Documents</td><td>Every document, with its uploader, deleted ones marked, “Who has opened it” from all portals, text preview, and download.</td></tr>
+          <tr><td>Audit log</td><td><code>permission_audit</code>: grant, revoke, create user, create account, view document, download document. Who, what, when, written in the same transaction as the change.</td></tr>
+          <tr><td>Assistant log</td><td><code>assistant_events</code>: every question with its outcome: answered, answered from cache, blocked (off-topic, manipulation, or an unverified answer), rate-limited, or an error.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="ref-group" id="r-data">
+      <h3>Data model</h3>
+      <p>Postgres 17. Snake case, integer keys, a foreign key for every link, money as <code>numeric</code>. Market value, client counts, weights and gains are computed in SQL, not stored. Seven migrations, applied in order at start.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th scope="col">Table</th><th scope="col">Holds</th></tr></thead>
+        <tbody>
+          <tr><td><code>advisors</code>, <code>clients</code>, <code>admins</code></td><td>People. Usernames match Cognito. No passwords anywhere in the database.</td></tr>
+          <tr><td><code>accounts</code></td><td>Individual, joint, IRA or trust; open and close dates.</td></tr>
+          <tr><td><code>account_access</code></td><td>The ACL: one row links an account to one advisor or client with a role (owner, joint owner, advisor, viewer). Checks enforce exactly one person and a role that fits.</td></tr>
+          <tr><td><code>securities</code>, <code>asset_classes</code>, <code>sectors</code>, <code>currencies</code></td><td>Reference data for about 60 real tickers.</td></tr>
+          <tr><td><code>holdings</code>, <code>transactions</code>, <code>performance</code></td><td>Month-end positions, 2 years of activity, monthly returns from 1 day to 5 years.</td></tr>
+          <tr><td><code>documents</code></td><td>Seeded text or uploaded file details (storage key, type, size, SHA-256, uploader, note, <code>deleted_at</code>). Checks: at most one uploader (an advisor or a client), and either text or a file.</td></tr>
+          <tr><td><code>document_events</code></td><td>Upload, view, download and delete, by which advisor or client, and when.</td></tr>
+          <tr><td><code>permission_audit</code></td><td>The admin audit log.</td></tr>
+          <tr><td><code>agent_conversations</code>, <code>answer_cache</code>, <code>assistant_events</code></td><td>Assistant chat history, cached answers, and the request log used for limits.</td></tr>
+          <tr><td><code>demo_users</code></td><td>Which seeded people are the demo users, and what each can see.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="ref-group" id="r-aws">
+      <h3>AWS and delivery</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th scope="col">Piece</th><th scope="col">Detail</th></tr></thead>
+        <tbody>
+          <tr><td>ECS Express Mode</td><td>One Fargate task (0.5 vCPU, 1 GB) behind a managed HTTPS load balancer. The container serves the API, the agent and the built Angular app. At start it migrates, seeds an empty database and creates the demo logins.</td></tr>
+          <tr><td>RDS Postgres 17</td><td><code>db.t4g.micro</code>, encrypted, not publicly reachable, 1-day backups, password managed by RDS in Secrets Manager.</td></tr>
+          <tr><td>Secrets Manager</td><td>The RDS password and the shared demo password, injected when the container starts. No Anthropic key on AWS.</td></tr>
+          <tr><td>Amazon Bedrock</td><td>Claude Sonnet 4.6 and Haiku 4.5 through US cross-region inference profiles. The task role may invoke only those profiles, and the underlying models only through them.</td></tr>
+          <tr><td>S3</td><td>The documents bucket described above.</td></tr>
+          <tr><td>IAM roles</td><td>GitHub deploy role (OIDC, no stored keys), task execution role (pull image, read secrets), task role (Bedrock and documents only), ECS Express infrastructure role.</td></tr>
+          <tr><td>Terraform</td><td>Two stacks: <code>infra/persistent</code> (Cognito, ECR, demo-password secret; kept) and <code>infra/app</code> (database, service, bucket, roles; torn down).</td></tr>
+          <tr><td>GitHub Actions</td><td>CI on every push: backend lint and tests against a real Postgres, frontend tests and build. Deploy and Tear down are manual buttons.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="ref-group" id="r-tests">
+      <h3>Tests</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th scope="col">Suite</th><th scope="col">What it proves</th></tr></thead>
+        <tbody>
+          <tr><td>Backend (294, pytest)</td><td>Every access rule on a small hand-built fixture: no-access advisors see nothing from any tool or endpoint; a shared-one-account advisor never sees the client's other accounts or documents; the model can't supply <code>advisor_id</code>; token checks; admin rules and audit rows; every document rule, including a failed S3 write saving nothing.</td></tr>
+          <tr><td>Frontend (11, Vitest)</td><td>Formatting helpers, download filenames, the app shell.</td></tr>
+          <tr><td>End to end (Playwright)</td><td>In the browser: each demo user sees only their data; the admin grants access and the advisor sees it; an advisor uploads and the client sees it as New, downloads it, and the advisor sees “opened by”. A Cognito suite runs against a real user pool.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="ref-group" id="r-tradeoffs">
+      <h3>Trade-offs and known limits</h3>
+      <ul class="card" style="list-style: disc; padding-left: 2.2rem">
+        <li>Files are streamed through the API, not by pre-signed S3 links. That means one code path locally and on AWS and no public bucket address; the 10 MB limit keeps memory use small.</li>
+        <li>The file is written to S3 before the database transaction commits. If the commit then fails, an unreferenced file stays in the bucket. No one can reach it, and teardown removes it.</li>
+        <li>Uploaded files aren't virus-scanned. Content checks stop disguised files, and the sandbox header stops them from running scripts in the browser.</li>
+        <li>Deleting a document hides it but keeps the file, for the audit. A real firm would add a retention policy.</li>
+        <li>One task and a single-zone database keep the demo near $0.10–0.15 an hour; production would run at least two tasks across availability zones.</li>
+      </ul>
     </div>
   </section>
 </div>
@@ -556,6 +794,19 @@
         { node: 'n_limits', edges: [['p7'], ['p17']], text: '<strong>AI agent:</strong> the request is counted and logged.' },
         { node: 'n_scope', edges: [['p8'], ['p9'], ['p9', true]], text: '<strong>AI agent:</strong> Claude Haiku 5.5 classifies it as out of scope.' },
         { node: 'n_adv', edges: [['p7', true], ['p4', true], ['p3', true], ['p1', true]], text: 'A fixed reply comes back. Sonnet is never called, and the admin sees it in the Assistant log.' },
+      ],
+    },
+    share: {
+      color: 'var(--client)',
+      steps: [
+        { node: 'n_cli', edges: [['p2']], text: 'Kevin Keith opens Documents, picks his Roth IRA (required), adds a title and a note, chooses a PDF and selects Upload.' },
+        { node: 'n_auth', edges: [['p3']], text: 'The sign-in check verifies his token: he is in the clients group.' },
+        { node: 'n_docs', edges: [['pDoc']], text: 'The upload endpoint checks the account is one Kevin may upload to: open, with his access row, not as a viewer. Then the file: at most 10 MB, an allowed type (PDF, TXT, PNG, JPG, DOCX), and bytes that really are that type.' },
+        { node: 'n_access', edges: [['pDA'], ['p14']], text: 'In the request transaction: a <code>documents</code> row (uploader, SHA-256, random storage key) and an <code>upload</code> row in <code>document_events</code>.' },
+        { node: 'n_s3', edges: [['pS3']], text: 'The file is stored at <code>documents/{account}/{random id}</code>. If storing fails, the transaction rolls back and nothing is saved.' },
+        { node: 'n_adv', edges: [['p1'], ['p3'], ['pDoc'], ['pDA'], ['p14']], text: 'Anthony, an advisor on that account, opens Documents. The list joins his visible accounts, so it includes Kevin\u2019s upload, marked New, and the menu shows a count.' },
+        { node: 'n_s3', edges: [['pDoc'], ['pDA'], ['pS3'], ['pS3', true], ['pDA', true], ['pDoc', true], ['p3', true], ['p1', true]], text: 'He selects Open. The access check runs again, the file is read from S3 and streamed back with no-cache and sandbox headers, and a <code>view</code> event is recorded.' },
+        { node: 'n_cli', edges: [['p2'], ['p3'], ['pDoc'], ['pDA'], ['p14'], ['p14', true], ['pDA', true], ['pDoc', true], ['p3', true], ['p2', true]], text: 'Kevin reloads: the document now says \u201cOpened by Anthony Gonzalez\u201d. Admins see the same open under \u201cWho has opened it\u201d.' },
       ],
     },
     grant: {
