@@ -321,8 +321,13 @@ AWS changes (deploy, teardown, IAM, Bedrock access) still need the owner's expli
   Scope eval: 23/23 allowed, 22/23 blocked; the miss ("Danielle Johnson's clients", another advisor) was
   there before the change and is harmless (tools only return the signed-in advisor's data).
 - Live check: "which clients have documents mentioning college savings" ran 3 searches over MCP and
-  answered honestly. Seeded document bodies are Faker filler, so search demos look odd: proposed follow-up
-  is realistic templated document text in the generator.
+  answered honestly.
+- Realistic seeded documents (2026-11-14): policy statements state the client's real target allocation,
+  objectives, horizon and constraints; review notes cover college savings, retirement, beneficiaries,
+  rebalancing, tax-loss harvesting, large expenses, RMDs; statements show value and change; agreements show
+  fee and authority. Wording uses a separate per-account RNG, so every other table is byte-identical (checked
+  by hashing). Local DB updated in place (683/683 seeded rows matched; uploads, audit and chats kept). AWS
+  gets it on the next deploy (fresh seed).
 
 ## Known follow-ups
 

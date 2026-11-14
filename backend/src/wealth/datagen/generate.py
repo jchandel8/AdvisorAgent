@@ -580,48 +580,167 @@ def _simulate_account(rng, prices: PriceBook, acct: dict, hh: Household, history
 # --------------------------------------------------------------------------------------------------
 
 
+OBJECTIVES = {
+    "conservative": "preserve capital and produce steady income, accepting lower long-term growth",
+    "moderate": "balance long-term growth with income and moderate year-to-year swings",
+    "growth": "grow the portfolio over the long term while keeping some income and stability",
+    "aggressive": "maximize long-term growth and accept large short-term swings in value",
+}
+CONSTRAINTS = [
+    "No single stock may exceed 10% of the account.",
+    "Avoid tobacco and firearms companies.",
+    "Prefer municipal bonds in taxable accounts for tax efficiency.",
+    "Keep at least six months of planned withdrawals in cash.",
+    "No leverage, options or private placements.",
+    "Coordinate trades with the client's other accounts to avoid wash sales.",
+]
+CHILDREN = ["Emma", "Liam", "Olivia", "Noah", "Ava", "Ethan", "Mia", "Lucas", "Sofia", "Mason"]
+EXPENSES = [
+    "a home renovation",
+    "a daughter's wedding",
+    "a new car",
+    "a second home down payment",
+    "a long trip abroad",
+]
+
+
 def _documents(fake, rng, acct, owners: list[dict], hh: Household, sim_start, anchor, values_by_date):
+    """1 to 3 documents per account with realistic text built from the account's own facts.
+
+    The main `rng` draws below are unchanged from earlier versions (kinds, dates, fee, size), so changing the
+    wording never shifts the portfolio simulation. All wording choices use a separate, per-account generator.
+    """
     names = " and ".join(f"{c['first_name']} {c['last_name']}" for c in owners)
+    first = owners[0]["first_name"]
     alloc = ALLOCATIONS[hh.risk_profile]
+    words = random.Random(f"documents:{acct['id']}")  # wording only; deterministic per account
     kinds = rng.sample(["ips", "review_notes", "statement", "agreement"], rng.randint(1, 3))
     docs = []
     for kind in kinds:
         created = sim_start + timedelta(days=rng.randint(0, max(0, (anchor - sim_start).days)))
         if kind == "ips":
             title = f"Investment Policy Statement - {acct['account_name']}"
-            text = (
-                f"Investment Policy Statement for {names}. Account: {acct['account_name']}. "
-                f"Risk profile: {hh.risk_profile}. Target allocation: equity {alloc['equity']:.0%}, "
-                f"fixed income {alloc['fixed_income']:.0%}, cash {alloc['cash']:.0%}. "
-                f"Rebalance when any asset class drifts more than 5 percentage points from target. "
-                f"{fake.paragraph(nb_sentences=4)}"
-            )
+            text = _ips(words, acct, names, hh.risk_profile, alloc, created)
         elif kind == "review_notes":
             title = f"Review notes {created.isoformat()} - {acct['account_name']}"
-            concern = (
-                "Client asked about the portfolio's concentration in technology stocks; discussed trimming "
-                "tech exposure toward the target allocation. "
-                if hh.tech_flagged
-                else "Client is comfortable with the current allocation. "
-            )
-            text = f"Review meeting with {names} on {created.isoformat()}. {concern}{fake.paragraph(nb_sentences=5)}"
+            text = _review_notes(words, acct, names, first, hh, alloc, created, values_by_date)
         elif kind == "statement":
             as_of = max((d for d in values_by_date if d <= created), default=None) or min(values_by_date)
             title = f"Statement {as_of.isoformat()} - {acct['account_name']}"
-            text = (
-                f"Account statement for {acct['account_name']} ({names}). "
-                f"Market value as of {as_of.isoformat()}: ${values_by_date[as_of]:,.2f}. "
-                f"{fake.paragraph(nb_sentences=3)}"
-            )
+            text = _statement(acct, names, as_of, values_by_date)
         else:
             title = f"Advisory agreement - {acct['account_name']}"
-            text = (
-                f"Advisory agreement between the firm and {names} for {acct['account_name']}. "
-                f"Annual advisory fee: {rng.choice(['0.75%', '1.00%', '1.25%'])} of assets under management, "
-                f"billed quarterly in arrears. {fake.paragraph(nb_sentences=4)}"
-            )
+            fee = rng.choice(["0.75%", "1.00%", "1.25%"])
+            text = _agreement(words, acct, names, fee, created)
         docs.append((acct["id"], title, kind, text, rng.randint(40, 900), created))
     return docs
+
+
+def _pct(x: float) -> str:
+    return f"{x:.0%}"
+
+
+def _ips(words, acct, names, risk, alloc, created) -> str:
+    horizon = words.choice(["more than 10 years", "7 to 10 years", "at least 15 years", "5 to 7 years"])
+    liquidity = words.choice(
+        [
+            "No regular withdrawals are planned.",
+            f"Planned withdrawals of about ${words.randrange(2, 9) * 1000:,} a month starting in {created.year + 2}.",
+            "An annual withdrawal for charitable giving each December.",
+        ]
+    )
+    rules = " ".join(words.sample(CONSTRAINTS, 2))
+    extra = {
+        "ira": "As an IRA, the account must meet required minimum distribution rules once they apply.",
+        "trust": "The trustee directs this account under the trust agreement; distributions follow its terms.",
+        "joint": "Both joint owners approved this statement; either may request changes.",
+    }.get(acct["account_type"], "")
+    return (
+        f"Investment Policy Statement for {names}, account {acct['account_name']}, adopted {created.isoformat()}. "
+        f"Risk profile: {risk}. Objective: {OBJECTIVES[risk]}. Time horizon: {horizon}. "
+        f"Target allocation: equity {_pct(alloc['equity'])}, fixed income {_pct(alloc['fixed_income'])}, "
+        f"cash {_pct(alloc['cash'])}. Rebalancing: review quarterly and rebalance when any asset class drifts more "
+        f"than 5 percentage points from target. Liquidity: {liquidity} Constraints: {rules} {extra} "
+        f"This statement is reviewed at least once a year or after a major life event."
+    ).replace("  ", " ")
+
+
+def _review_notes(words, acct, names, first, hh, alloc, created, values_by_date) -> str:
+    topics = []
+    if hh.tech_flagged:
+        topics.append(
+            "Client asked about the portfolio's concentration in technology stocks; discussed trimming tech "
+            "exposure toward the target allocation."
+        )
+    pool = [
+        f"Discussed college savings for their child {words.choice(CHILDREN)}, who starts college in "
+        f"{created.year + words.randrange(2, 12)}; reviewed 529 plan contributions of "
+        f"${words.randrange(2, 11) * 100:,} a month.",
+        f"{first} plans to retire in {created.year + words.randrange(3, 16)}; reviewed retirement income needs "
+        f"of about ${words.randrange(6, 19) * 10_000:,} a year.",
+        f"Confirmed beneficiary designations. Client will send an updated beneficiary form after "
+        f"{words.choice(['a recent marriage', 'the birth of a grandchild', 'updating their will'])}.",
+        f"Reviewed allocation against the target of {_pct(alloc['equity'])} equity; agreed to look at "
+        f"rebalancing at the next quarterly review.",
+        "Reviewed positions with unrealized losses for possible tax-loss harvesting before year end.",
+        f"Client expects {words.choice(EXPENSES)} costing about ${words.randrange(3, 16) * 10_000:,} in "
+        f"{created.year + 1}; discussed raising cash ahead of it.",
+        "Client was worried about market volatility; reviewed the long-term plan and the cash reserve.",
+        "Discussed charitable giving, including donating appreciated shares instead of cash.",
+    ]
+    if acct["account_type"] == "ira":
+        pool.append("Reviewed the required minimum distribution schedule and tax withholding.")
+    if acct["account_type"] == "trust":
+        pool.append("Trustee asked for a summary of distributions made this year.")
+    topics += words.sample(pool, 2 if topics else words.randint(2, 3))
+    action = words.choice(
+        [
+            "Advisor to send a rebalancing proposal.",
+            "Client to send updated income details.",
+            "Advisor to prepare a retirement income projection.",
+            "Schedule a follow-up call in six weeks.",
+        ]
+    )
+    return (
+        f"Review meeting with {names} on {created.isoformat()} about {acct['account_name']}. "
+        + " ".join(topics)
+        + f" Action items: {action}"
+    )
+
+
+def _statement(acct, names, as_of, values_by_date) -> str:
+    value = values_by_date[as_of]
+    earlier = [d for d in values_by_date if d < as_of]
+    change = ""
+    if earlier:
+        prev = values_by_date[max(earlier)]
+        diff = value - prev
+        change = (
+            f" Change since {max(earlier).isoformat()}: {'+' if diff >= 0 else '-'}${abs(diff):,.2f} "
+            f"({diff / prev:+.1%}), including deposits, withdrawals and market movement."
+            if prev
+            else ""
+        )
+    return (
+        f"Account statement for {acct['account_name']} ({names}). Market value as of {as_of.isoformat()}: "
+        f"${value:,.2f}.{change} Positions are valued at closing prices on the statement date. Dividends are "
+        f"reinvested in cash unless the client instructs otherwise."
+    )
+
+
+def _agreement(words, acct, names, fee, created) -> str:
+    authority = words.choice(["discretionary", "non-discretionary"])
+    authority_text = (
+        "The advisor may buy and sell securities without asking before each trade, within the investment policy."
+        if authority == "discretionary"
+        else "The advisor recommends trades and the client approves each one before it is placed."
+    )
+    return (
+        f"Advisory agreement between the firm and {names} for {acct['account_name']}, signed {created.isoformat()}. "
+        f"Annual advisory fee: {fee} of assets under management, billed quarterly in arrears. "
+        f"Authority: {authority}. {authority_text} Either party may end this agreement with 30 days' written "
+        f"notice. The client receives quarterly statements and an annual review."
+    )
 
 
 # --------------------------------------------------------------------------------------------------
