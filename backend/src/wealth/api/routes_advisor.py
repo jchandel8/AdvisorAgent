@@ -6,6 +6,7 @@ account_access rows, and a client the advisor shares no account with is 404.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
@@ -21,6 +22,7 @@ from wealth.access import ToolContext, accessible_client_name
 from wealth.agent.answer_cache import AnswerCache
 from wealth.agent.guard import ScopeGuard
 from wealth.agent.loop import AdvisorAgent
+from wealth.agent.trace import Tracer
 from wealth.api import conversations, queries, usage
 from wealth.api.deps import CurrentUser, get_agent_conn, get_conn, get_llm_client, require_advisor
 from wealth.config import get_settings
@@ -123,6 +125,7 @@ def ask(
             raise HTTPException(404, "Conversation not found.")
         history, transcript, updated_at = conv["history"], conv["transcript"], conv["updated_at"]
 
+    trace = Tracer("assistant", advisor_id, body.message, focus_client_id=body.client_id)
     agent = AdvisorAgent(
         advisor_id,
         llm,
@@ -132,20 +135,25 @@ def ask(
         transcript=transcript,
         guard=guard,
         advisor_name=user.name,
+        trace=trace,
     )
     try:
         result = agent.ask(body.message, focus_client_id=body.client_id)
     except anthropic.RateLimitError as exc:
         with store() as c:
             usage.finish(c, event_id, "error", "upstream rate limit")
+        _save_trace(store, trace, "error", None, agent.model, event_id)
         raise HTTPException(429, "The assistant is busy. Try again in a moment.") from exc
     except anthropic.APIError as exc:
         with store() as c:
             usage.finish(c, event_id, "error", f"upstream: {type(exc).__name__}")
+        _save_trace(store, trace, "error", None, agent.model, event_id)
         raise HTTPException(502, "The assistant is unavailable right now.") from exc
 
+    outcome = usage.outcome_for(result.stop_reason)
     with store() as c:
-        usage.finish(c, event_id, usage.outcome_for(result.stop_reason), result.guard_reason)
+        usage.finish(c, event_id, outcome, result.guard_reason)
+    run_id = _save_trace(store, trace, outcome, result.text, agent.model, event_id)
     if result.stop_reason == "not_found":
         raise HTTPException(404, "Client not found.")
 
@@ -171,6 +179,8 @@ def ask(
             )
             if not saved:
                 raise HTTPException(409, "This conversation changed in another window. Reload to continue.")
+        if run_id is not None:
+            c.execute("UPDATE agent_runs SET conversation_id = %s WHERE id = %s", (conversation_id, run_id))
 
     return {
         "conversation_id": conversation_id,
@@ -180,3 +190,16 @@ def ask(
         "blocked": result.blocked,
         "tool_calls": [{"name": c.name, "input": c.input, "is_error": c.is_error} for c in result.tool_calls],
     }
+
+
+log = logging.getLogger(__name__)
+
+
+def _save_trace(store, trace: Tracer, outcome: str, answer, model: str, event_id: int) -> int | None:
+    """Save the run's trace in its own transaction. A tracing problem never fails the advisor's request."""
+    try:
+        with store() as c:
+            return trace.save(c, outcome=outcome, answer=answer, model=model, assistant_event_id=event_id)
+    except Exception:
+        log.exception("could not save the agent trace")
+        return None

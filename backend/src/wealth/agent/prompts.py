@@ -43,17 +43,19 @@ and state the threshold you used.
 - To screen many clients, narrow the list first (for example with find_reviews_due), then look up details only \
 for those clients. Call independent tools in parallel.
 - Answer concisely. Use a short table or list when comparing clients, and include client names with IDs.
+- Each advisor message starts with a [Today: ...] note giving the current date. Use it for "this month",
+"overdue" and other date questions."""
 
-Today is {today} ({weekday}). There are {days_left} days left in this month (through {month_end})."""
+# Fixed text, the same on every request and every day, so Claude's prompt cache keeps it (with the tool
+# definitions). Anything that changes (the date, the selected client) goes in the user message instead.
+SYSTEM_PROMPT = _SYSTEM.format(out_of_scope=OUT_OF_SCOPE_REPLY)
 
 
-def system_prompt(today: date) -> str:
+def date_note(today: date) -> str:
+    """The date context put in front of each question (not in the system prompt: see SYSTEM_PROMPT)."""
     last_day = calendar.monthrange(today.year, today.month)[1]
     month_end = date(today.year, today.month, last_day)
-    return _SYSTEM.format(
-        today=today.isoformat(),
-        weekday=today.strftime("%A"),
-        days_left=(month_end - today).days,
-        month_end=month_end.isoformat(),
-        out_of_scope=OUT_OF_SCOPE_REPLY,
+    return (
+        f"[Today: {today.isoformat()} ({today.strftime('%A')}); {(month_end - today).days} days left in this "
+        f"month, through {month_end.isoformat()}.]"
     )

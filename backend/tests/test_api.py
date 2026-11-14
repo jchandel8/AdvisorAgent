@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from tests.fixtures import A1, A2, A3, C1, C2, C3, C4, J, K, X, Y, Z
 from tests.test_agent_loop import FakeClient, reply, text, tool_use
 from tests.test_guard import FakeGuard
+from wealth.agent.loop import _without_notes
 from wealth.api import deps, routes_advisor
 from wealth.api.main import create_app
 from wealth.config import get_settings
@@ -44,6 +45,7 @@ def api(conn, fake_llm, fake_guard, monkeypatch):
     app = create_app()
     app.dependency_overrides[deps.get_conn] = lambda: conn
     app.dependency_overrides[deps.get_agent_conn] = lambda: conn
+    app.dependency_overrides[deps.get_write_conn] = lambda: conn  # never touch the development database
     app.dependency_overrides[deps.get_llm_client] = lambda: fake_llm
     app.dependency_overrides[routes_advisor.get_store] = lambda: store
     app.dependency_overrides[routes_advisor.get_guard] = lambda: fake_guard
@@ -217,7 +219,9 @@ def test_assistant_conversation_continues(api, fake_llm, conn):
     sent = fake_llm.requests[-1]["messages"]
     assert [m["role"] for m in sent] == ["user", "assistant", "user"]
     row = conn.execute("SELECT transcript FROM agent_conversations").fetchone()
-    assert row["transcript"] == ["hello", "first", "and again", "second"]
+    # Stored questions carry the backend's [Today: ...] note (internal: the cache key; never shown in the UI).
+    assert [_without_notes(t) for t in row["transcript"]] == ["hello", "first", "and again", "second"]
+    assert row["transcript"][0].startswith("[Today: ")
 
 
 def test_assistant_conversation_of_another_advisor_is_404(api, fake_llm):
@@ -235,7 +239,11 @@ def test_assistant_focus_client_is_sent_as_context(api, fake_llm):
     fake_llm.responses += [reply("end_turn", text("ok"))]
     ask(api, A1, message="How are they doing?", client_id=C1)
     first_message = fake_llm.requests[0]["messages"][0]["content"]
-    assert first_message.startswith(f"[Selected client: Cli {C1} (client ID {C1}).")
+    notes = first_message.split("\n\n")[0].splitlines()
+    assert notes[0].startswith("[Today: ") and notes[1].startswith(
+        f"[Selected client: Cli {C1} (client ID {C1})."
+    )
+    assert first_message.endswith("How are they doing?")
 
 
 def test_assistant_stops_if_access_is_revoked_mid_answer(api, fake_llm, conn):
