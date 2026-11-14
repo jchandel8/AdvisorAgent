@@ -157,7 +157,7 @@
       with <strong>Amazon Cognito</strong>; the backend reads who you are only from the verified token. Everything an
       advisor or client sees, including every lookup the AI makes, goes through one <strong>access layer</strong> that
       reads only accounts the signed-in person has an <code>account_access</code> row for. The <strong>AI agent</strong>
-      (ochre) lives inside the backend: it asks for data through six read-only tools, never sees who it acts for, and
+      (ochre) lives inside the backend: it asks for data through eight read-only tools on an MCP server, never sees who it acts for, and
       never touches the database directly. <strong>Admins</strong> change who can see what; every change is written to
       an audit log in the same transaction. <strong>Documents</strong> are shared per account: anyone with access to an
       account (its advisors and its owners) sees, opens and downloads its documents. Files sit in a private S3 bucket and
@@ -183,7 +183,7 @@
 
     <figure class="canvas">
       <svg viewBox="0 0 1200 770" role="img" id="diagram"
-        aria-label="Advisor, client and admin portals run in the browser as one Angular app. People sign in on Amazon Cognito's hosted page; the app sends the token with every API call. In the FastAPI backend, a sign-in check routes requests to the assistant endpoint, the admin endpoints or the portal endpoints. The AI agent zone holds limits and audit log, a scope check using Claude Haiku 5.5, the agent loop using Claude Sonnet 5.5, and six read-only tools. Portal endpoints and tools read Postgres only through the access layer. Admin endpoints write grants and the audit log to Postgres in one transaction. Document endpoints check access through the access layer, keep document rows and open events in Postgres, and keep the files in S3 storage.">
+        aria-label="Advisor, client and admin portals run in the browser as one Angular app. People sign in on Amazon Cognito's hosted page; the app sends the token with every API call. In the FastAPI backend, a sign-in check routes requests to the assistant endpoint, the admin endpoints or the portal endpoints. The AI agent zone holds limits and audit log, a scope check using Claude Haiku 5.5, the agent loop using Claude Sonnet 5.5, and eight read-only tools on the Portfolio MCP server. Portal endpoints and tools read Postgres only through the access layer. Admin endpoints write grants and the audit log to Postgres in one transaction. Document endpoints check access through the access layer, keep document rows and open events in Postgres, and keep the files in S3 storage.">
         <defs>
           <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0 0 L10 5 L0 10 z" class="arrowhead" />
@@ -322,7 +322,7 @@
         </g>
         <g class="node" id="n_tools">
           <rect class="box-ai" x="690" y="312" width="220" height="56" rx="8" />
-          <text class="t" x="704" y="333">6 read-only tools</text>
+          <text class="t" x="704" y="333">8 tools via MCP</text>
           <text class="s" x="704" y="350">run as the signed-in advisor;</text>
           <text class="s" x="704" y="363">the model never supplies advisor_id</text>
         </g>
@@ -485,14 +485,16 @@
         </ol>
       </div>
       <div class="card">
-        <h3>Its six tools</h3>
+        <h3>Its eight tools (Portfolio MCP server)</h3>
         <ul>
           <li><code>get_my_clients</code>: clients the advisor shares an account with</li>
           <li><code>get_accounts</code>: one client's shared accounts</li>
+          <li><code>get_client_profile</code>: risk profile, target and current allocation</li>
           <li><code>get_holdings</code>: positions, sector and asset-class mix, with filters</li>
           <li><code>get_transactions</code>: activity and realized gains, with filters</li>
           <li><code>get_performance</code>: returns from 1 day to 5 years</li>
           <li><code>find_reviews_due</code>: reviews due soon or overdue</li>
+          <li><code>search_documents</code>: full-text search of the accounts' documents</li>
         </ul>
         <p>All math (totals, weights, gains) is done in SQL, not by the model.</p>
       </div>
@@ -516,6 +518,115 @@
           <li>See accounts without an <code>account_access</code> row. Unknown and forbidden IDs look identical.</li>
         </ul>
       </div>
+    </div>
+  </section>
+
+  <section class="stage" aria-labelledby="finalyst-title">
+    <h2 id="finalyst-title">The AI Finalyst: agents, MCP servers and checks</h2>
+    <p class="lede" style="margin-top:0">
+      The advisor picks a client and a kind of brief. Code runs the steps in order; models decide what to search and
+      what to write. Ochre boxes are model calls; the rest is deterministic code. Every step is recorded in the
+      agent trace.
+    </p>
+    <figure class="canvas">
+      <svg viewBox="0 0 1200 500" role="img"
+        aria-label="The advisor's request goes to a scope check of the optional note, then a facts step that calls the Portfolio MCP server. Then a research agent using the Market MCP server and an analytics step using the Analytics MCP server run in parallel. Claude Opus drafts the brief, a review checks every figure in code and asks Claude Sonnet about suitability and tone, with one revision, and the brief is saved. The Portfolio server reads Postgres through the access layer; the Market server sends only checked news queries to Tavily.">
+        <defs>
+          <marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" class="arrowhead" />
+          </marker>
+        </defs>
+
+        <path class="edge" d="M170 140 L200 140" marker-end="url(#ah3)" />
+        <path class="edge" d="M340 140 L370 140" marker-end="url(#ah3)" />
+        <path class="edge" d="M510 130 C525 130 525 90 540 90" marker-end="url(#ah3)" />
+        <path class="edge" d="M510 150 C525 150 525 200 540 200" marker-end="url(#ah3)" />
+        <path class="edge" d="M700 90 C715 90 715 130 730 130" marker-end="url(#ah3)" />
+        <path class="edge" d="M700 200 C715 200 715 150 730 150" marker-end="url(#ah3)" />
+        <path class="edge" d="M880 140 L910 140" marker-end="url(#ah3)" />
+        <path class="edge" d="M1060 140 L1090 140" marker-end="url(#ah3)" />
+        <path class="edge dash" d="M985 110 C985 60 805 60 805 108" marker-end="url(#ah3)" />
+        <path class="edge" d="M440 170 L440 300" marker-end="url(#ah3)" />
+        <path class="edge" d="M555 120 L555 300" marker-end="url(#ah3)" />
+        <path class="edge" d="M640 230 C640 270 800 270 800 300" marker-end="url(#ah3)" />
+        <path class="edge" d="M440 370 L440 410" marker-end="url(#ah3)" />
+        <path class="edge" d="M620 370 L620 410" marker-end="url(#ah3)" />
+
+        <text class="lbl" x="185" y="130" text-anchor="middle">note</text>
+        <text class="lbl" x="895" y="56" text-anchor="middle">revise once if the review finds problems</text>
+        <text class="lbl" x="448" y="240">tools</text>
+        <text class="lbl" x="563" y="260">news, moves</text>
+        <text class="lbl" x="735" y="262">drift, concentration</text>
+        <text class="lbl" x="628" y="396">checked queries only</text>
+
+        <g><rect class="box box-adv" x="20" y="105" width="150" height="70" rx="10" />
+          <rect class="band-adv" x="20" y="105" width="8" height="70" rx="3" />
+          <text class="t" x="38" y="133">AI Finalyst page</text>
+          <text class="s" x="38" y="151">client, brief type,</text>
+          <text class="s" x="38" y="165">optional note</text></g>
+        <g><rect class="box-ai" x="200" y="105" width="140" height="70" rx="10" />
+          <text class="t" x="214" y="133">1 Scope check</text>
+          <text class="s" x="214" y="151">Haiku, on the note</text>
+          <text class="s" x="214" y="165">only</text></g>
+        <g><rect class="box" x="370" y="105" width="140" height="70" rx="10" />
+          <text class="t" x="384" y="133">2 Facts</text>
+          <text class="s" x="384" y="151">code: profile, holdings,</text>
+          <text class="s" x="384" y="165">returns, trades, docs</text></g>
+        <g><rect class="box-ai" x="540" y="55" width="160" height="65" rx="10" />
+          <text class="t" x="554" y="80">3a Research agent</text>
+          <text class="s" x="554" y="97">Sonnet; sees holdings,</text>
+          <text class="s" x="554" y="111">never the client</text></g>
+        <g><rect class="box" x="540" y="170" width="160" height="60" rx="10" />
+          <text class="t" x="554" y="195">3b Analytics</text>
+          <text class="s" x="554" y="213">code, in parallel</text></g>
+        <g><rect class="box-ai" x="730" y="105" width="150" height="70" rx="10" />
+          <text class="t" x="744" y="133">4 Draft</text>
+          <text class="s" x="744" y="151">Opus, structured brief</text>
+          <text class="s" x="744" y="165">facts block cached</text></g>
+        <g><rect class="box-ai" x="910" y="105" width="150" height="70" rx="10" />
+          <text class="t" x="924" y="133">5 Review</text>
+          <text class="s" x="924" y="151">code: every figure</text>
+          <text class="s" x="924" y="165">in data; Sonnet: fit</text></g>
+        <g><rect class="box" x="1090" y="105" width="95" height="70" rx="10" />
+          <text class="t" x="1102" y="133">Brief</text>
+          <text class="s" x="1102" y="151">saved,</text>
+          <text class="s" x="1102" y="165">reused today</text></g>
+
+        <g><rect class="box" x="370" y="300" width="160" height="70" rx="10" style="stroke: var(--advisor)" />
+          <text class="t" x="384" y="326">Portfolio MCP</text>
+          <text class="s" x="384" y="343">8 tools, signed token,</text>
+          <text class="s" x="384" y="357">loopback only</text></g>
+        <g><rect class="box" x="545" y="300" width="160" height="70" rx="10" style="stroke: var(--advisor)" />
+          <text class="t" x="559" y="326">Market MCP</text>
+          <text class="s" x="559" y="343">news (6 h cache),</text>
+          <text class="s" x="559" y="357">sector moves; egress guard</text></g>
+        <g><rect class="box" x="720" y="300" width="160" height="70" rx="10" style="stroke: var(--advisor)" />
+          <text class="t" x="734" y="326">Analytics MCP</text>
+          <text class="s" x="734" y="343">pure math, no data</text>
+          <text class="s" x="734" y="357">stored</text></g>
+        <g><rect class="box" x="370" y="410" width="160" height="60" rx="10" />
+          <text class="t" x="384" y="435">Postgres</text>
+          <text class="s" x="384" y="452">through the access layer</text></g>
+        <g><rect class="box" x="545" y="410" width="160" height="60" rx="10" style="stroke-dasharray: 5 4" />
+          <text class="t" x="559" y="435">Tavily news API</text>
+          <text class="s" x="559" y="452">outside the app</text></g>
+      </svg>
+    </figure>
+    <figcaption class="cap">
+      A live brief: about 2 minutes, 6 model calls and 14 tool calls, about $0.40 with Opus 5.5; the revision read the
+      shared facts block from the cache. Briefs show only to advisors who still share an account with the client.
+    </figcaption>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">MCP server</th><th scope="col">Tools</th><th scope="col">Rules</th></tr></thead>
+        <tbody>
+          <tr><td>Portfolio <code>/mcp/portfolio/</code></td><td><code>get_my_clients</code>, <code>get_accounts</code>, <code>get_client_profile</code>, <code>get_holdings</code>, <code>get_transactions</code>, <code>get_performance</code>, <code>find_reviews_due</code>, <code>search_documents</code></td><td>Serves the same tool registry as before, so the access layer is still the one boundary. Schemas are byte-identical to the local ones (keys sorted) so the prompt cache holds.</td></tr>
+          <tr><td>Analytics <code>/mcp/analytics/</code></td><td><code>allocation_drift</code>, <code>concentration</code>, <code>rebalance_preview</code></td><td>Pure functions on numbers passed in; the model never does arithmetic.</td></tr>
+          <tr><td>Market <code>/mcp/market/</code></td><td><code>search_news</code>, <code>sector_moves</code>, <code>security_profile</code></td><td>News from Tavily (cached 6 hours); prices from the seeded data. Refuses queries with a database person's full name, an email or a long number before anything leaves the app.</td></tr>
+          <tr><td>All three</td><td colspan="2">Mounted inside the FastAPI app. A 2-minute HS256 internal token per server carries the advisor; requests through a proxy, from a non-loopback address, with a non-loopback Host or a bad token are refused.</td></tr>
+        </tbody>
+      </table>
     </div>
   </section>
 
@@ -610,7 +721,7 @@
     </div>
 
     <div class="ref-group" id="r-api">
-      <h3>API endpoints (33)</h3>
+      <h3>API endpoints (41)</h3>
       <p>One FastAPI app serves all three portals. The role is checked first, then the access layer.</p>
       <div class="tablewrap"><table>
         <thead><tr><th scope="col">Endpoint</th><th scope="col">Who</th><th scope="col">What it returns or does</th></tr></thead>
@@ -632,7 +743,9 @@
           <tr><td><code>GET · POST /api/admin/accounts</code>, <code>GET /api/admin/accounts/{id}</code>, <code>GET /api/admin/accounts/{id}/access</code></td><td><span class="who adm">admin</span></td><td>List and create accounts; one account with everyone on it and its documents (no portfolio values).</td></tr>
           <tr><td><code>GET /api/admin/people</code>, <code>POST /api/admin/access</code>, <code>DELETE /api/admin/access/{id}</code></td><td><span class="who adm">admin</span></td><td>Find a person; grant or revoke access. Each change writes an audit row in the same transaction.</td></tr>
           <tr><td><code>GET /api/admin/documents</code>, <code>/{id}</code>, <code>/{id}/content</code>, <code>/{id}/download</code></td><td><span class="who adm">admin</span></td><td>All documents (deleted ones marked); details with who has opened it; text preview; download. Preview and download are audited.</td></tr>
-          <tr><td><code>GET /api/admin/audit</code>, <code>GET /api/admin/assistant-events</code></td><td><span class="who adm">admin</span></td><td>The permission audit log and the assistant log, paged.</td></tr>
+          <tr><td><code>GET /api/admin/audit</code>, <code>GET /api/admin/assistant-events</code></td><td><span class="who adm">admin</span></td><td>The permission audit log and the assistant log, paged (each question links to its trace).</td></tr>
+          <tr><td><code>GET /api/admin/agent-runs</code>, <code>/{id}</code></td><td><span class="who adm">admin</span></td><td>Agent runs with filters; one run with every step's request and response. Opening one is audited.</td></tr>
+          <tr><td><code>POST · GET /api/advisor/finalyst/briefs</code>, <code>GET /{id}</code></td><td><span class="who adv">advisor</span></td><td>Start a brief (background run, same-day reuse, 5 an hour, 20 a day), list briefs, poll one for its stage and result.</td></tr>
         </tbody>
       </table></div>
     </div>
@@ -645,7 +758,8 @@
           <tr><td>Limits</td><td>10 questions a minute and 100 a day per advisor (settings). Each request is reserved as a row in <code>assistant_events</code> and later given its outcome.</td><td><code>api/usage.py</code></td></tr>
           <tr><td>Scope check</td><td>Haiku (5.5 locally, 4.5 on AWS) classifies the question with a strict JSON schema. Off-topic or manipulation gets a fixed reply. If the check fails, the request is refused (fails closed).</td><td><code>agent/guard.py</code></td></tr>
           <tr><td>Agent loop</td><td>Manual tool-use loop with Sonnet (5.5 locally, 4.6 on AWS): at most 10 rounds and 16,000 output tokens. Tool input is validated with pydantic (<code>extra="forbid"</code>), then the tool runs with the advisor ID from the token. Model fallbacks are used with the Anthropic API only.</td><td><code>agent/loop.py</code>, <code>agent/prompts.py</code></td></tr>
-          <tr><td>Six tools</td><td><code>get_my_clients</code>, <code>get_accounts</code>, <code>get_holdings</code>, <code>get_transactions</code>, <code>get_performance</code>, <code>find_reviews_due</code>. Read-only transactions; all math in SQL; their schemas have no <code>advisor_id</code>.</td><td><code>tools/</code></td></tr>
+          <tr><td>Eight tools over MCP</td><td>The six original tools plus <code>search_documents</code> and <code>get_client_profile</code>, served by the Portfolio MCP server. Read-only transactions; all math in SQL; their schemas have no <code>advisor_id</code>.</td><td><code>tools/</code>, <code>mcp/</code></td></tr>
+          <tr><td>Traces</td><td>Every scope check, model call and tool call with exact inputs and results, tokens, cache use, cost and time, for the admin's Agent runs screen. 64 KB cap, 30-day expiry, no secrets.</td><td><code>agent/trace.py</code></td></tr>
           <tr><td>Answer cache</td><td>The same question with the same scope reuses the answer until the earlier of 24 hours or local midnight.</td><td><code>agent/answer_cache.py</code></td></tr>
           <tr><td>Conversations</td><td>Saved per advisor in <code>agent_conversations</code>, so a chat continues across page loads.</td><td><code>api/conversations.py</code></td></tr>
           <tr><td>Provider switch</td><td><code>LLM_PROVIDER=anthropic</code> (API key, local) or <code>bedrock</code> (IAM role, AWS). Same code, one client factory.</td><td><code>llm.py</code></td></tr>
@@ -709,6 +823,8 @@
           <tr><td><code>permission_audit</code></td><td>The admin audit log.</td></tr>
           <tr><td><code>agent_conversations</code>, <code>answer_cache</code>, <code>assistant_events</code></td><td>Assistant chat history, cached answers, and the request log used for limits.</td></tr>
           <tr><td><code>demo_users</code></td><td>Which seeded people are the demo users, and what each can see.</td></tr>
+          <tr><td><code>agent_runs</code>, <code>agent_steps</code>, <code>agent_prompts</code></td><td>Full traces of assistant questions and Finalyst briefs; system prompts stored once per version.</td></tr>
+          <tr><td><code>finalyst_briefs</code>, <code>market_news_cache</code></td><td>Saved briefs with their stage, review and trace; cached news searches (6 hours, public news only).</td></tr>
         </tbody>
       </table></div>
     </div>
@@ -735,8 +851,9 @@
       <div class="tablewrap"><table>
         <thead><tr><th scope="col">Suite</th><th scope="col">What it proves</th></tr></thead>
         <tbody>
-          <tr><td>Backend (294, pytest)</td><td>Every access rule on a small hand-built fixture: no-access advisors see nothing from any tool or endpoint; a shared-one-account advisor never sees the client's other accounts or documents; the model can't supply <code>advisor_id</code>; token checks; admin rules and audit rows; every document rule, including a failed S3 write saving nothing.</td></tr>
-          <tr><td>Frontend (11, Vitest)</td><td>Formatting helpers, download filenames, the app shell.</td></tr>
+          <tr><td>Backend (419, pytest)</td><td>Every access rule on a small hand-built fixture: no-access advisors see nothing from any tool or endpoint; a shared-one-account advisor never sees the client's other accounts or documents; the model can't supply <code>advisor_id</code>; token checks; admin rules and audit rows; every document rule, including a failed S3 write saving nothing.</td></tr>
+          <tr><td>Frontend (15, Vitest)</td><td>Formatting helpers, download filenames, trace step summaries, the app shell.</td></tr>
+          <tr><td>Evals (19 cases, live)</td><td>Real questions against the seed with expected answers computed from the tools; code graders plus a Claude grader for judgment calls. A free version runs in CI.</td></tr>
           <tr><td>End to end (Playwright)</td><td>In the browser: each demo user sees only their data; the admin grants access and the advisor sees it; an advisor uploads and the client sees it as New, downloads it, and the advisor sees “opened by”. A Cognito suite runs against a real user pool.</td></tr>
         </tbody>
       </table></div>
