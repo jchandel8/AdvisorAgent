@@ -580,12 +580,31 @@ def _document(conn, document_id: int) -> dict:
 def document_detail(
     document_id: int, admin: CurrentUser = Depends(require_admin), conn=Depends(get_write_conn)
 ):
-    """Facts about the document and who has opened it. Not the text itself (see /content)."""
+    """Facts about the document and who has opened it. Not the text itself (see /content).
+
+    The access log merges two sources: admin opens (permission_audit) and opens from the advisor and
+    client portals (document_events). Uploads and deletes are not opens and are left out.
+    """
     doc = _document(conn, document_id)
     opened = conn.execute(
-        """SELECT id, created_at, admin_id, admin_name, action FROM permission_audit
-           WHERE document_id = %s ORDER BY created_at DESC, id DESC LIMIT 20""",
-        (document_id,),
+        """SELECT * FROM (
+             SELECT 'admin-' || pa.id AS key, pa.created_at, 'admin' AS person_type,
+                    pa.admin_id AS person_id, pa.admin_name AS name,
+                    CASE pa.action WHEN 'view_document' THEN 'view' ELSE 'download' END AS action
+             FROM permission_audit pa
+             WHERE pa.document_id = %(doc)s AND pa.action IN ('view_document', 'download_document')
+             UNION ALL
+             SELECT 'portal-' || e.id, e.created_at, e.person_type,
+                    coalesce(e.advisor_id, e.client_id),
+                    coalesce(ad.first_name || ' ' || ad.last_name, c.first_name || ' ' || c.last_name),
+                    e.action
+             FROM document_events e
+             LEFT JOIN advisors ad ON ad.id = e.advisor_id
+             LEFT JOIN clients c ON c.id = e.client_id
+             WHERE e.document_id = %(doc)s AND e.action IN ('view', 'download')
+           ) opens
+           ORDER BY created_at DESC, key DESC LIMIT 20""",
+        {"doc": document_id},
     ).fetchall()
     return {**doc, "access_log": opened}
 

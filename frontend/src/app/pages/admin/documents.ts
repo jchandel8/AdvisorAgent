@@ -281,9 +281,10 @@ export class AdminDocuments {
           <dt class="text-ink-muted">Last opened</dt>
           <dd>
             @if (d.access_log.length) {
-              {{ fmt(d.access_log[0].created_at) }} by {{ d.access_log[0].admin_name }}
+              {{ fmt(d.access_log[0].created_at) }} by {{ d.access_log[0].name }}
+              ({{ d.access_log[0].person_type }})
             } @else {
-              Never opened in the admin portal
+              Never opened
             }
           </dd>
         </div>
@@ -305,37 +306,41 @@ export class AdminDocuments {
 
       <section class="mt-10 max-w-3xl" aria-labelledby="opened-title">
         <h2 id="opened-title" class="text-xl font-semibold">Who has opened it</h2>
-        <p class="mt-1 mb-4 text-ink-muted">The 20 most recent previews and downloads.</p>
+        <p class="mt-1 mb-4 text-ink-muted">
+          The 20 most recent opens and downloads, from the admin, advisor and client portals.
+        </p>
         @if (!d.access_log.length) {
-          <app-empty message="No one has previewed or downloaded this document yet." />
+          <app-empty message="No one has opened or downloaded this document yet." />
         } @else {
           <div class="overflow-x-auto rounded-[var(--radius-panel)] border border-rule bg-surface">
             <table class="ledger w-full min-w-[32rem] text-[0.9375rem]">
               <caption class="sr-only">
-                Previews and downloads, newest first
+                Opens and downloads, newest first
               </caption>
               <thead class="text-left text-sm text-ink-muted">
                 <tr>
                   <th scope="col" class="px-4 py-3 font-medium">When</th>
-                  <th scope="col" class="px-4 py-3 font-medium">Admin</th>
+                  <th scope="col" class="px-4 py-3 font-medium">Person</th>
+                  <th scope="col" class="px-4 py-3 font-medium">Type</th>
                   <th scope="col" class="px-4 py-3 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
-                @for (e of d.access_log; track e.id) {
+                @for (e of d.access_log; track e.key) {
                   <tr class="border-t border-rule">
                     <td class="num px-4 py-3 whitespace-nowrap">{{ fmt(e.created_at) }}</td>
                     <td class="px-4 py-3">
-                      @if (e.admin_id) {
-                        <a class="hover:underline" [routerLink]="['/admin/users', 'admin', e.admin_id]">{{
-                          e.admin_name
+                      @if (e.person_id) {
+                        <a class="hover:underline" [routerLink]="['/admin/users', e.person_type, e.person_id]">{{
+                          e.name
                         }}</a>
                       } @else {
-                        {{ e.admin_name }}
+                        {{ e.name }}
                       }
                     </td>
+                    <td class="px-4 py-3 capitalize">{{ e.person_type }}</td>
                     <td class="px-4 py-3">
-                      {{ e.action === 'view_document' ? 'Previewed' : 'Downloaded' }}
+                      {{ e.action === 'view' ? 'Opened' : 'Downloaded' }}
                     </td>
                   </tr>
                 }
