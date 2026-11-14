@@ -20,6 +20,7 @@ from wealth.agent.loop import AdvisorAgent
 from wealth.config import get_settings
 from wealth.db import close_pools, read_only
 from wealth.llm import make_client, missing_setup
+from wealth.mcp.client import LocalToolRunner
 
 
 def main() -> None:
@@ -58,6 +59,7 @@ def main() -> None:
         model=args.model,
         today=args.today,
         cache=cache,
+        tools=LocalToolRunner(),  # the terminal runs tools directly (no web server needed)
     )
     print(f"Signed in as advisor {args.advisor_id} ({name}). Model: {agent.model}. Today: {agent.today}.")
     print("Ask a question, or type 'exit'.\n")

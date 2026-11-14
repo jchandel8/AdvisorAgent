@@ -15,6 +15,7 @@ dependencies = [
     "cryptography>=46,<49", # 49+ has no Intel-macOS wheels; Linux images are unaffected
     "boto3>=1.35",
     "python-multipart>=0.0.20",
+    "mcp==2.3.0",
 ]
 
 [project.scripts]

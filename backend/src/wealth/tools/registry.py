@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -95,13 +96,19 @@ TOOLS: dict[str, Tool] = {
 }
 
 
+def canonical_schema(schema: dict) -> dict:
+    """The schema with keys sorted at every level. Tool definitions are part of the cached prompt prefix, so
+    they must be byte-identical on every request, whichever path (local or MCP) they came through."""
+    return json.loads(json.dumps(schema, sort_keys=True))
+
+
 def _input_schema(model: type[BaseModel]) -> dict:
     schema = model.model_json_schema()
     schema.pop("title", None)
     for prop in schema.get("properties", {}).values():
         prop.pop("title", None)
     schema.setdefault("properties", {})
-    return schema
+    return canonical_schema(schema)
 
 
 def tool_definitions() -> list[dict]:
