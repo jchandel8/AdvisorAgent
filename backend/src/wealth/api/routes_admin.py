@@ -82,9 +82,9 @@ def get_logins() -> Logins:
 def _audit(conn, admin: CurrentUser, action: str, summary: str, **fields: Any) -> None:
     conn.execute(
         """INSERT INTO permission_audit (admin_id, admin_name, action, account_id, person_type, person_id, role,
-                                         document_id, summary)
+                                         document_id, agent_run_id, summary)
            VALUES (%(admin_id)s, %(admin_name)s, %(action)s, %(account_id)s, %(person_type)s, %(person_id)s,
-                   %(role)s, %(document_id)s, %(summary)s)""",
+                   %(role)s, %(document_id)s, %(agent_run_id)s, %(summary)s)""",
         {
             "admin_id": admin.id,
             "admin_name": admin.name,
@@ -94,6 +94,7 @@ def _audit(conn, admin: CurrentUser, action: str, summary: str, **fields: Any) -
             "person_id": fields.get("person_id"),
             "role": fields.get("role"),
             "document_id": fields.get("document_id"),
+            "agent_run_id": fields.get("agent_run_id"),
             "summary": summary,
         },
     )
@@ -671,7 +672,7 @@ def audit_log(
     size = 50
     rows = conn.execute(
         """SELECT id, created_at, admin_id, admin_name, action, account_id, person_type, person_id, role,
-                  document_id, summary, count(*) OVER () AS total_rows
+                  document_id, agent_run_id, summary, count(*) OVER () AS total_rows
            FROM permission_audit
            WHERE %(admin_id)s::int IS NULL OR admin_id = %(admin_id)s
            ORDER BY created_at DESC, id DESC LIMIT %(size)s OFFSET %(offset)s""",
@@ -693,8 +694,9 @@ def assistant_events(
     size = 50
     rows = conn.execute(
         """SELECT e.id, e.created_at, e.advisor_id, v.first_name || ' ' || v.last_name AS advisor_name,
-                  e.outcome, e.question, e.reason, count(*) OVER () AS total_rows
+                  e.outcome, e.question, e.reason, r.id AS run_id, count(*) OVER () AS total_rows
            FROM assistant_events e JOIN advisors v ON v.id = e.advisor_id
+           LEFT JOIN agent_runs r ON r.assistant_event_id = e.id
            WHERE NOT %(blocked)s OR e.outcome LIKE 'blocked%%' OR e.outcome IN ('guard_error', 'rate_limited')
            ORDER BY e.created_at DESC, e.id DESC LIMIT %(size)s OFFSET %(offset)s""",
         {"blocked": blocked_only, "size": size, "offset": (page - 1) * size},
@@ -703,3 +705,84 @@ def assistant_events(
     for r in rows:
         del r["total_rows"]
     return {"page": page, "page_size": size, "total_rows": total, "events": rows}
+
+
+# --- agent runs (full traces) --------------------------------------------------------------------------
+
+RUN_LIST_SQL = """
+SELECT r.id, r.feature, r.started_at, r.finished_at,
+       (extract(epoch FROM r.finished_at - r.started_at) * 1000)::int AS duration_ms,
+       r.advisor_id, v.first_name || ' ' || v.last_name AS advisor_name,
+       r.focus_client_id, c.first_name || ' ' || c.last_name AS focus_client_name,
+       r.question, r.outcome, r.model, r.model_calls, r.tool_calls, r.input_tokens, r.output_tokens,
+       r.cache_read_tokens, r.cache_write_tokens, r.cost_usd,
+       CASE WHEN r.input_tokens + r.cache_read_tokens + r.cache_write_tokens > 0
+            THEN round(100.0 * r.cache_read_tokens / (r.input_tokens + r.cache_read_tokens + r.cache_write_tokens), 1)
+       END AS cache_hit_pct
+FROM agent_runs r
+JOIN advisors v ON v.id = r.advisor_id
+LEFT JOIN clients c ON c.id = r.focus_client_id"""
+
+
+@router.get("/agent-runs")
+def agent_runs(
+    advisor_id: int | None = Query(default=None, gt=0),
+    client_id: int | None = Query(default=None, gt=0),
+    feature: Literal["assistant", "finalyst"] | None = None,
+    outcome: str | None = Query(default=None, max_length=40),
+    page: int = Query(default=1, ge=1, le=10_000),
+    admin: CurrentUser = Depends(require_admin),
+    conn=Depends(get_write_conn),
+):
+    """Runs newest first, 50 a page. Shows each question; the steps (client data) are in the audited detail."""
+    size = 50
+    rows = conn.execute(
+        f"""SELECT runs.*, count(*) OVER () AS total_rows FROM ({RUN_LIST_SQL}
+              WHERE (%(advisor)s::int IS NULL OR r.advisor_id = %(advisor)s::int)
+                AND (%(client)s::int IS NULL OR r.focus_client_id = %(client)s::int)
+                AND (%(feature)s::text IS NULL OR r.feature = %(feature)s::text)
+                AND (%(outcome)s::text IS NULL OR r.outcome = %(outcome)s::text)) runs
+            ORDER BY runs.started_at DESC, runs.id DESC LIMIT %(size)s OFFSET %(offset)s""",
+        {
+            "advisor": advisor_id,
+            "client": client_id,
+            "feature": feature,
+            "outcome": outcome,
+            "size": size,
+            "offset": (page - 1) * size,
+        },
+    ).fetchall()
+    total = rows[0]["total_rows"] if rows else 0
+    for r in rows:
+        del r["total_rows"]
+    return {"page": page, "page_size": size, "total_rows": total, "runs": rows}
+
+
+@router.get("/agent-runs/{run_id}")
+def agent_run(run_id: int, admin: CurrentUser = Depends(require_admin), conn=Depends(get_write_conn)):
+    """One run with every step, request and response included. Opening it is recorded in the audit log."""
+    run = conn.execute(RUN_LIST_SQL + " WHERE r.id = %s", (run_id,)).fetchone()
+    if run is None:
+        raise HTTPException(404, "Agent run not found.")
+    extra = conn.execute(
+        """SELECT r.answer, r.conversation_id, r.assistant_event_id, p.hash AS prompt_hash, p.role AS prompt_role,
+                  p.text AS system_prompt, p.tools AS tool_definitions
+           FROM agent_runs r LEFT JOIN agent_prompts p ON p.hash = r.prompt_hash WHERE r.id = %s""",
+        (run_id,),
+    ).fetchone()
+    steps = conn.execute(
+        """SELECT seq, kind, name, started_at, duration_ms, request, response, truncated, is_error, stop_reason,
+                  input_tokens, output_tokens, cache_read_tokens, cache_write_tokens
+           FROM agent_steps WHERE run_id = %s ORDER BY seq""",
+        (run_id,),
+    ).fetchall()
+    _audit(
+        conn,
+        admin,
+        "view_agent_run",
+        f"Viewed agent run #{run_id} ({run['feature']}) of {run['advisor_name']}",
+        person_type="advisor",
+        person_id=run["advisor_id"],
+        agent_run_id=run_id,
+    )
+    return {**run, **extra, "steps": steps}

@@ -81,6 +81,7 @@ _SCHEMA = {
 class Verdict:
     category: Category
     reason: str
+    usage: Any = None  # the API usage object of the check (tokens, cache), for traces
 
     @property
     def allowed(self) -> bool:
@@ -117,7 +118,9 @@ class ScopeGuard:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=1024,
-                system=_INSTRUCTIONS,
+                # Fixed instructions marked cacheable. Haiku 5.5 caches prompts from 512 tokens; Haiku 4.5 (AWS)
+                # needs 4,096, so there it simply isn't cached (no error, no extra cost).
+                system=[{"type": "text", "text": _INSTRUCTIONS, "cache_control": {"type": "ephemeral"}}],
                 messages=[{"role": "user", "content": f"{context}<message>\n{question}\n</message>"}],
                 output_config=_output_config(self.model),
             )
@@ -128,7 +131,7 @@ class ScopeGuard:
             category = data.get("category")
             if category not in ("in_scope", "out_of_scope", "manipulation"):
                 return Verdict("error", f"unexpected category {category!r}")
-            return Verdict(category, str(data.get("reason", ""))[:200])
+            return Verdict(category, str(data.get("reason", ""))[:200], getattr(response, "usage", None))
         except Exception as exc:  # fail closed: never let a question through because the check broke
             log.warning("scope guard failed: %s", exc)
             return Verdict("error", f"guard failed: {type(exc).__name__}")
