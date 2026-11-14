@@ -1,11 +1,16 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AccountAccess,
   AccountList,
+  AccountDetail,
   AdminAccount,
   AdminUser,
+  DocumentDetail,
+  DocumentPage,
+  UserDetail,
+  UserKind,
   AssistantEvent,
   AuditEvent,
   NewAccount,
@@ -154,8 +159,39 @@ export class Api {
   revoke(accessId: number): Observable<unknown> {
     return this.http.delete(`/api/admin/access/${accessId}`);
   }
-  auditLog(page: number): Observable<Paged<AuditEvent>> {
-    return this.http.get<Paged<AuditEvent>>('/api/admin/audit', { params: this.params({ page }) });
+  /** The audit log, newest first; with adminId, only that admin's entries. */
+  auditLog(page: number, adminId: number | null = null): Observable<Paged<AuditEvent>> {
+    return this.http.get<Paged<AuditEvent>>('/api/admin/audit', {
+      params: this.params({ page, admin_id: adminId }),
+    });
+  }
+  adminUser(kind: UserKind, id: number): Observable<UserDetail> {
+    return this.http.get<UserDetail>(`/api/admin/users/${kind}/${id}`);
+  }
+  adminAccount(id: number): Observable<AccountDetail> {
+    return this.http.get<AccountDetail>(`/api/admin/accounts/${id}`);
+  }
+  adminDocuments(q: string, docType: string | null, page: number): Observable<DocumentPage> {
+    return this.http.get<DocumentPage>('/api/admin/documents', {
+      params: this.params({ q: q || null, doc_type: docType, page }),
+    });
+  }
+  adminDocument(id: number): Observable<DocumentDetail> {
+    return this.http.get<DocumentDetail>(`/api/admin/documents/${id}`);
+  }
+  /** The text for the preview. The server records the view in the audit log. */
+  documentContent(id: number): Observable<{ document_id: number; text: string }> {
+    return this.http.get<{ document_id: number; text: string }>(
+      `/api/admin/documents/${id}/content`,
+    );
+  }
+  /** The .txt file. Fetched through HttpClient (not a plain link) so the sign-in token is sent.
+   *  The server records the download in the audit log. */
+  downloadDocument(id: number): Observable<HttpResponse<Blob>> {
+    return this.http.get(`/api/admin/documents/${id}/download`, {
+      observe: 'response',
+      responseType: 'blob',
+    });
   }
   assistantLog(page: number, blockedOnly: boolean): Observable<Paged<AssistantEvent>> {
     return this.http.get<Paged<AssistantEvent>>('/api/admin/assistant-events', {

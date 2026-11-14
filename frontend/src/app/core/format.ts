@@ -52,6 +52,20 @@ export const accountTypeLabel: Record<string, string> = {
   trust: 'Trust',
 };
 
+export const docTypeLabel: Record<string, string> = {
+  ips: 'Investment policy',
+  review_notes: 'Review notes',
+  statement: 'Statement',
+  agreement: 'Agreement',
+};
+
+export const roleLabel: Record<string, string> = {
+  owner: 'Owner',
+  joint_owner: 'Joint owner',
+  advisor: 'Advisor',
+  viewer: 'Viewer',
+};
+
 export const assetClassLabel: Record<string, string> = {
   equity: 'Stocks',
   fixed_income: 'Bonds',

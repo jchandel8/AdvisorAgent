@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { Router, provideRouter } from '@angular/router';
 import { Auth } from './auth';
+import { filenameFrom } from './download';
 import { dateLong, money, percent, swatchSlot } from './format';
 import { Session, sessionInterceptor } from './session';
 
@@ -128,5 +129,21 @@ describe('sessionInterceptor in cognito mode', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(nav).toHaveBeenCalledWith('/login');
+  });
+});
+
+describe('filenameFrom', () => {
+  it('reads the server filename and falls back when there is none', () => {
+    expect(filenameFrom('attachment; filename="review-notes-402.txt"', 'x.txt')).toBe(
+      'review-notes-402.txt',
+    );
+    expect(filenameFrom('attachment; filename=plain.txt', 'x.txt')).toBe('plain.txt');
+    expect(filenameFrom(null, 'document-7.txt')).toBe('document-7.txt');
+    expect(filenameFrom('attachment', 'document-7.txt')).toBe('document-7.txt');
+  });
+
+  it('never keeps a path from the server', () => {
+    expect(filenameFrom('attachment; filename="../../etc/passwd"', 'x.txt')).toBe('passwd');
+    expect(filenameFrom('attachment; filename="a\\\\b\\\\c.txt"', 'x.txt')).toBe('c.txt');
   });
 });

@@ -9,6 +9,8 @@ Account J (303): C2 owner, C3 joint  + A1 and A2
 Account Z (304): C3 owner            + A2          <- A1 must NOT see this
 Account K (305): C1 owner            + A1, CLOSED  <- hidden from tools
 Account W (306): C4 owner            + A2
+
+Documents: D1 (401) on X uploaded by A1; D2 (402) on J uploaded by A2.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ C1, C2, C3, C4 = 201, 202, 203, 204
 X, Y, J, Z, K, W = 301, 302, 303, 304, 305, 306
 ALL_ACCOUNTS = [X, Y, J, Z, K, W]
 ALL_CLIENTS = [C1, C2, C3, C4]
+D1, D2 = 401, 402
 MISSING_ID = 999_999
 
 SECURITIES = [
@@ -149,4 +152,30 @@ def load_fixture(conn: psycopg.Connection) -> None:
         " return_ytd, return_1y, return_2y, return_3y, return_5y)"
         " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
         PERFORMANCE,
+    )
+    cur.executemany(
+        "INSERT INTO documents (id, account_id, title, doc_type, text, size_kb, created_date,"
+        " uploaded_by_advisor_id) OVERRIDING SYSTEM VALUE VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+        [
+            (
+                D1,
+                X,
+                "Investment policy statement",
+                "ips",
+                "Target 60/40.\nRebalance yearly.",
+                3,
+                date(2026, 3, 2),
+                A1,
+            ),
+            (
+                D2,
+                J,
+                "Q3 review notes",
+                "review_notes",
+                "Discussed college savings.",
+                2,
+                date(2026, 10, 5),
+                A2,
+            ),
+        ],
     )

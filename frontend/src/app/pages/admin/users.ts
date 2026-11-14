@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, input, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 import { Api } from '../../core/api';
 import { NewUser } from '../../core/models';
 import { FIELD, apiError } from '../../shared/person-picker';
@@ -9,7 +10,7 @@ type Kind = 'advisor' | 'client' | 'admin';
 
 @Component({
   selector: 'app-admin-users',
-  imports: [Icon, Loading, ErrorState, Empty],
+  imports: [RouterLink, Icon, Loading, ErrorState, Empty],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="flex flex-wrap items-end justify-between gap-4">
@@ -205,9 +206,13 @@ type Kind = 'advisor' | 'client' | 'admin';
               <tbody>
                 @for (p of u.users; track p.id) {
                   <tr class="border-t border-rule">
-                    <th scope="row" class="px-4 py-3 text-left font-medium">
-                      {{ p.first_name }} {{ p.last_name }}
-                      <span class="num text-sm font-normal text-ink-muted">#{{ p.id }}</span>
+                    <th scope="row" class="px-4 py-2 text-left font-medium">
+                      <a
+                        class="inline-flex min-h-11 items-center gap-2 hover:underline"
+                        [routerLink]="['/admin/users', kind(), p.id]"
+                        >{{ p.first_name }} {{ p.last_name }}
+                        <span class="num text-sm font-normal text-ink-muted">#{{ p.id }}</span></a
+                      >
                     </th>
                     <td class="px-4 py-3">{{ p.username }}</td>
                     <td class="px-4 py-3 text-ink-muted">{{ p.email }}</td>
@@ -230,8 +235,10 @@ type Kind = 'advisor' | 'client' | 'admin';
     </section>
   `,
 })
-export class AdminUsers {
+export class AdminUsers implements OnInit {
   private readonly api = inject(Api);
+  /** ?kind=advisor|client|admin (the "All users" link from a user page keeps the tab). */
+  readonly kindParam = input<string>(undefined, { alias: 'kind' });
   protected readonly field = FIELD;
   protected readonly kinds: { value: Kind; label: string }[] = [
     { value: 'advisor', label: 'Advisors' },
@@ -244,6 +251,11 @@ export class AdminUsers {
     params: () => ({ kind: this.kind(), q: this.query() }),
     stream: ({ params }) => this.api.adminUsers(params.kind, params.q),
   });
+
+  ngOnInit(): void {
+    const k = this.kindParam();
+    if (k === 'advisor' || k === 'client' || k === 'admin') this.kind.set(k);
+  }
 
   protected readonly showForm = signal(false);
   protected readonly saving = signal(false);

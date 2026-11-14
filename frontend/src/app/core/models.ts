@@ -264,9 +264,85 @@ export interface Person {
 export interface AuditEvent {
   id: number;
   created_at: string;
+  admin_id: number | null;
   admin_name: string;
   action: string;
+  account_id: number | null;
+  document_id: number | null;
   summary: string;
+}
+
+export type UserKind = 'advisor' | 'client' | 'admin';
+
+export interface UserProfile {
+  id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  created_at: string;
+  phone?: string | null;
+  certifications?: string[] | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  risk_profile?: string;
+  target_allocation?: Record<string, number>;
+  next_review_date?: string | null;
+}
+
+export interface UserAccount {
+  account_id: number;
+  account_name: string;
+  account_type: string;
+  open_date: string;
+  close_date: string | null;
+  role: string;
+  granted_at: string;
+  clients: string | null;
+  advisors: string | null;
+}
+
+export interface UserDetail {
+  kind: UserKind;
+  profile: UserProfile;
+  accounts: UserAccount[];
+}
+
+export interface AdminDocument {
+  document_id: number;
+  title: string;
+  doc_type: string;
+  size_kb: number;
+  created_date: string;
+  account_id: number;
+  account_name: string;
+  uploaded_by_id: number | null;
+  uploaded_by: string | null;
+}
+
+export interface DocumentPage {
+  page: number;
+  page_size: number;
+  total_rows: number;
+  documents: AdminDocument[];
+}
+
+export interface DocumentOpen {
+  id: number;
+  created_at: string;
+  admin_id: number | null;
+  admin_name: string;
+  action: 'view_document' | 'download_document';
+}
+
+export interface DocumentDetail extends AdminDocument {
+  access_log: DocumentOpen[];
+}
+
+export interface AccountDetail extends AccountAccess {
+  description: string | null;
+  documents: AdminDocument[];
 }
 
 export interface AssistantEvent {
