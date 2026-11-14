@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 import { Api } from '../../core/api';
 import { Empty, ErrorState, Loading } from '../../shared/ui';
 
@@ -13,9 +14,10 @@ export const ACTION_LABEL: Record<string, string> = {
   create_account: 'Created account',
   view_document: 'Viewed document',
   download_document: 'Downloaded document',
+  view_agent_run: 'Opened agent run',
 };
 
-const OUTCOME_LABEL: Record<string, string> = {
+export const OUTCOME_LABEL: Record<string, string> = {
   blocked_scope: 'Off topic',
   blocked_manipulation: 'Manipulation',
   blocked_unverified: 'Unsupported figures',
@@ -76,9 +78,7 @@ const OUTCOME_LABEL: Record<string, string> = {
           </div>
           <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Pages">
             <p class="num text-sm text-ink-muted">
-              Page {{ l.page }} of {{ pages(l.total_rows, l.page_size) }} ({{
-                l.total_rows
-              }}
+              Page {{ l.page }} of {{ pages(l.total_rows, l.page_size) }} ({{ l.total_rows }}
               entries)
             </p>
             <div class="flex gap-2">
@@ -121,7 +121,7 @@ export class AdminAudit {
 
 @Component({
   selector: 'app-admin-assistant-log',
-  imports: [Loading, ErrorState, Empty],
+  imports: [RouterLink, Loading, ErrorState, Empty],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="flex flex-wrap items-end justify-between gap-4">
@@ -152,7 +152,7 @@ export class AdminAudit {
           />
         } @else {
           <div class="overflow-x-auto rounded-[var(--radius-panel)] border border-rule bg-surface">
-            <table class="ledger w-full min-w-[52rem] text-[0.9375rem]">
+            <table class="ledger w-full min-w-[58rem] text-[0.9375rem]">
               <caption class="sr-only">
                 Assistant questions, newest first
               </caption>
@@ -163,6 +163,7 @@ export class AdminAudit {
                   <th scope="col" class="px-4 py-3 font-medium">Outcome</th>
                   <th scope="col" class="px-4 py-3 font-medium">Question</th>
                   <th scope="col" class="px-4 py-3 font-medium">Reason</th>
+                  <th scope="col" class="px-4 py-3"><span class="sr-only">Trace</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -175,6 +176,16 @@ export class AdminAudit {
                     </td>
                     <td class="max-w-md px-4 py-3">{{ e.question }}</td>
                     <td class="max-w-xs px-4 py-3 text-sm text-ink-muted">{{ e.reason || '—' }}</td>
+                    <td class="px-4 py-2 text-right">
+                      @if (e.run_id) {
+                        <a
+                          class="inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3 text-sm whitespace-nowrap text-admin hover:bg-admin-soft"
+                          [routerLink]="['/admin/agent-runs', e.run_id]"
+                          [attr.aria-label]="'Open the trace of this question'"
+                          >Open trace</a
+                        >
+                      }
+                    </td>
                   </tr>
                 }
               </tbody>
