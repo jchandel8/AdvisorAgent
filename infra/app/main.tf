@@ -19,16 +19,11 @@ data "aws_ecr_repository" "app" {
   name = "advisoragent"
 }
 
-data "aws_secretsmanager_secret" "anthropic_api_key" {
-  name = "advisoragent/anthropic-api-key"
-}
-
 data "aws_secretsmanager_secret" "demo_password" {
   name = "advisoragent/demo-password"
 }
 
 locals {
-  bedrock = var.llm_provider == "bedrock"
   # Inference profile "us.anthropic.claude-x" routes to foundation model "anthropic.claude-x" in US regions.
   model_profiles = distinct([var.anthropic_model, var.guard_model])
   profile_arns = [
@@ -37,11 +32,8 @@ locals {
   foundation_model_arns = [
     for m in local.model_profiles : "arn:aws:bedrock:*::foundation-model/${replace(m, "/^(us|global)\\./", "")}"
   ]
-  # Secrets the container receives at start. No Anthropic API key when Claude is called through Bedrock.
-  secret_arns = concat(
-    [data.aws_secretsmanager_secret.demo_password.arn, aws_db_instance.db.master_user_secret[0].secret_arn],
-    local.bedrock ? [] : [data.aws_secretsmanager_secret.anthropic_api_key.arn],
-  )
+  # Secrets the container receives at start. No Claude API key: Bedrock is called with the task role.
+  secret_arns = [data.aws_secretsmanager_secret.demo_password.arn, aws_db_instance.db.master_user_secret[0].secret_arn]
 }
 
 # --- Database --------------------------------------------------------------------------------------
@@ -146,8 +138,8 @@ resource "aws_iam_role_policy_attachment" "infrastructure" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSInfrastructureRoleforExpressGatewayServices"
 }
 
-# Task role: what the running app may call. Cognito user administration (admin portal, demo logins) and,
-# with Bedrock, the two Claude models only.
+# Task role: what the running app may call. Cognito user administration (admin portal, demo logins) and the
+# two Claude models on Bedrock.
 resource "aws_iam_role" "task" {
   name               = "advisoragent-task"
   assume_role_policy = data.aws_iam_policy_document.ecs_tasks_trust.json
@@ -175,9 +167,8 @@ resource "aws_iam_role_policy" "task_cognito" {
 # profile forwards the call to the foundation model in another US region, so that ARN uses region "*", and the
 # condition allows it only when the call came through one of our profiles.
 resource "aws_iam_role_policy" "task_bedrock" {
-  count = local.bedrock ? 1 : 0
-  name  = "invoke-claude"
-  role  = aws_iam_role.task.id
+  name = "invoke-claude"
+  role = aws_iam_role.task.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -251,7 +242,7 @@ resource "aws_ecs_express_gateway_service" "app" {
     }
     environment {
       name  = "LLM_PROVIDER"
-      value = var.llm_provider
+      value = "bedrock"
     }
     environment {
       name  = "BEDROCK_REGION"
@@ -281,13 +272,6 @@ resource "aws_ecs_express_gateway_service" "app" {
     secret {
       name       = "DB_PASSWORD"
       value_from = "${aws_db_instance.db.master_user_secret[0].secret_arn}:password::"
-    }
-    dynamic "secret" {
-      for_each = local.bedrock ? [] : [data.aws_secretsmanager_secret.anthropic_api_key.arn]
-      content {
-        name       = "ANTHROPIC_API_KEY"
-        value_from = secret.value
-      }
     }
     secret {
       name       = "DEMO_PASSWORD"

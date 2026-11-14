@@ -21,15 +21,9 @@ resource "aws_ecr_lifecycle_policy" "app" {
   })
 }
 
-# Secret containers only. Terraform never sees the values: the owner sets them once with
-#   aws secretsmanager put-secret-value --secret-id advisoragent/anthropic-api-key --secret-string '...'
+# Secret container only. Terraform never sees the value: the owner sets it once with
 #   aws secretsmanager put-secret-value --secret-id advisoragent/demo-password --secret-string '...'
-resource "aws_secretsmanager_secret" "anthropic_api_key" {
-  name                    = "advisoragent/anthropic-api-key"
-  description             = "Anthropic API key for the advisor assistant"
-  recovery_window_in_days = 0
-}
-
+# (No Claude API key on AWS: the app calls Claude on Bedrock with its IAM task role.)
 resource "aws_secretsmanager_secret" "demo_password" {
   name                    = "advisoragent/demo-password"
   description             = "Shared password for the demo logins"
