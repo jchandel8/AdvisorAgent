@@ -116,7 +116,11 @@ test('admin drills down from a client to an account to a document and downloads 
   await expect(page).toHaveURL(/\/admin\/accounts\/\d+$/);
   await expect(page.getByRole('table', { name: /People with access/ })).toContainText('Kevin Keith');
   await expect(page.getByRole('table', { name: /People with access/ })).toContainText('Anthony Gonzalez');
-  await page.getByRole('link', { name: /^View details of / }).first().click();
+  // A seeded document (uploads made by other tests may also be on this account).
+  await page
+    .getByRole('link', { name: /^View details of (Statement|Review notes|Investment Policy|Advisory agreement)/ })
+    .first()
+    .click();
 
   // Document page: download a .txt, which is recorded and shown under "Who has opened it".
   await expect(page).toHaveURL(/\/admin\/documents\/\d+$/);
@@ -124,7 +128,7 @@ test('admin drills down from a client to an account to a document and downloads 
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download', exact: true }).click();
   expect((await download).suggestedFilename()).toMatch(/^[a-z0-9-]+-\d+\.txt$/);
-  await expect(page.getByRole('table', { name: /Previews and downloads/ })).toContainText('Downloaded');
+  await expect(page.getByRole('table', { name: /Opens and downloads/ })).toContainText('Downloaded');
 });
 
 test('advisor shares a document, the client reviews it, the advisor sees it was opened', async ({ browser }) => {

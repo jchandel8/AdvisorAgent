@@ -150,6 +150,17 @@ def _output_config(model: str) -> dict:
 _FIGURE = re.compile(r"\$\s?\d|\d[\d,]*(\.\d+)?\s?%|\d[\d,]*(\.\d+)?\s?(USD|dollars)\b", re.IGNORECASE)
 
 
-def unverified_figures(answer: str, tools_used_in_conversation: bool) -> bool:
-    """True when an answer quotes financial figures although no data was ever looked up."""
-    return not tools_used_in_conversation and bool(_FIGURE.search(answer))
+def unverified_figures(answer: str, tools_used_in_conversation: bool, known_text: str = "") -> bool:
+    """True when an answer quotes financial figures although no data was ever looked up.
+
+    Figures that appear in `known_text` (the assistant's own instructions, e.g. its default "30%" overweight
+    threshold) are allowed: explaining how the assistant works is not inventing client data.
+    """
+    if tools_used_in_conversation:
+        return False
+    known = {_norm(m.group()) for m in _FIGURE.finditer(known_text)}
+    return any(_norm(m.group()) not in known for m in _FIGURE.finditer(answer))
+
+
+def _norm(figure: str) -> str:
+    return re.sub(r"\s+", "", figure).lower()

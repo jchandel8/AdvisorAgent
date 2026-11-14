@@ -104,6 +104,12 @@ def test_unverified_figures(answer, tools_used, flagged):
     assert unverified_figures(answer, tools_used) is flagged
 
 
+def test_figures_from_the_assistants_own_instructions_are_allowed():
+    rules = "Unless the advisor gives a threshold, treat above 30% of the portfolio as overweight."
+    assert not unverified_figures("By default I use 30% of the portfolio.", False, rules)
+    assert unverified_figures("By default I use 30%. Kevin has 42.5% in tech.", False, rules)
+
+
 # --- in the agent loop ------------------------------------------------------------------------------------
 
 
