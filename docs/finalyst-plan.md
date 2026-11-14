@@ -67,16 +67,58 @@ Security, same rule as today: identity never comes from the model.
 - No vector database for now: full-text search needs no extra infrastructure and is easy to explain. Embeddings can
   come later.
 
-## 4. Tracing and evals (step 6c)
+## 4. Tracing, full agent logs and evals (step 6c)
 
-- New tables `agent_runs` (one per brief or question: who, client, type, status, total tokens, cost, time) and
-  `agent_steps` (each model call or tool call: step name, model, tokens in/out, latency, tool name, error).
-- Admin portal: **Agent runs** screen with a run's step-by-step timeline. It shows tool names and timings, but not the
-  client data inside them.
+The owner wants to see exactly what the agents did, with real values, for both the assistant and the Finalyst.
+
+- New tables `agent_runs` (one per question or brief: who, client, type, status, tokens, cache hit rate, cost, time)
+  and `agent_steps` (one per model call or tool call, in order).
+- Each step stores its **full detail**:
+  - for a tool call: the tool name, the exact arguments the model sent (after validation), and the full result
+    returned to the model, client data included;
+  - for a model call: the model, the text it wrote, the tool calls it asked for, the stop reason, tokens in and out,
+    cache read and write tokens, and latency;
+  - router classification, reviewer verdicts and revision notes;
+  - Market searches: the query, whether the egress guard allowed it, and the URLs returned;
+  - errors, refusals and limit hits.
+- What is never stored: the internal MCP token, API keys and passwords. The system prompts are stored once per
+  version (by hash), not in every run.
+- **Admin portal → Agent runs:** a list of runs (filter by advisor, client, feature, outcome) and a run's timeline.
+  Each step expands to show its request and response as readable JSON. The Assistant log links to each run's trace.
+- Safeguards, because this lets admins read client portfolio data, which they couldn't before:
+  - admins only;
+  - **opening a trace is itself audited** (`view_agent_run` in the audit log, like document previews);
+  - traces are deleted automatically after 30 days (a setting);
+  - each stored payload is capped at 64 KB, with a visible "truncated" marker.
 - Evals: about 25 questions with expected facts computed from the seeded database, graded by code (are the right
   clients named, do the numbers match), plus a Claude grader for "no instructions to the client, sources cited".
   A no-cost version with a fake model runs in CI; the real-model run is manual, because it costs money.
-- Per-run cost is measured here, so the Finalyst limits are set from real numbers, not guesses.
+- Per-run cost and cache hit rate are measured from these traces, so the Finalyst limits are set from real numbers.
+
+## 4b. Caching, used deliberately at every layer
+
+Every cache key that can hold client data includes the advisor ID and a fingerprint of the accounts they can see
+right now. Nothing is shared between advisors, and revoking access makes old entries unusable at once.
+
+| Layer | What is cached | Rule |
+|---|---|---|
+| Claude prompt caching | Each agent role's fixed prefix (tool definitions and system prompt) | One explicit cache breakpoint at the end of the fixed prefix, plus automatic caching for the growing tool loop. Prefixes are kept byte-for-byte stable: tools sorted by name, no dates or names in system prompts (today's date moves into the user message; the current assistant puts it in the system prompt, which resets the cache daily), and one fixed model, effort and thinking setting per role. |
+| Shared facts block | The Facts and Analytics output | Placed first in the Finalyst's and Reviewer's messages with a breakpoint, so the draft, the review and the revision all read it from the cache instead of paying for it three times. |
+| Answer cache (exists) | Assistant answers, until 24 hours or midnight | Key gains the account fingerprint. |
+| Brief reuse | A saved brief for the same advisor, client and type on the same day, with the same account fingerprint | Shown with "Run again" in place of a new paid run. |
+| Tool results within a run | Identical Portfolio or Analytics calls in one run | Memoized for that run only, never across runs or people. |
+| Market news | Search results per normalized query | 6 hours in Postgres; also saves free-tier quota. |
+| Sector moves | Computed from seeded prices | Cached per sector, period and price date (the data changes only when re-seeded). |
+
+Check that it works, now and later:
+- the cache read and write tokens of every model call are stored in `agent_steps`, and the admin trace shows the hit
+  rate;
+- a CI test renders each role's prompt twice and asserts the bytes before the breakpoint are identical;
+- a manual real-model check asserts the second identical request reads from the cache.
+
+Model minimums matter: prompts shorter than the model's minimum silently don't cache (Haiku 4.5 on AWS needs 4,096
+tokens, Sonnet 4.6 needs 1,024, and the 5.5 models need 512). The small router prompt won't cache on AWS. That is
+expected; it's cheap. The large prefixes, tools and the facts block, are the ones that matter.
 
 ## 5. Finalyst feature (step 7)
 
@@ -99,7 +141,7 @@ Security, same rule as today: identity never comes from the model.
 |---|---|---|
 | 6a | Portfolio + Analytics MCP servers; the assistant switched to MCP | ACL through MCP; bad, expired or missing internal token; non-loopback refused; model-supplied advisor ID rejected |
 | 6b | Document search + text extraction | shared-one-account advisor can't find the client's other documents; deleted documents not found |
-| 6c | Tracing tables, admin Agent runs screen, evals | every step recorded; admin sees no client data in traces |
+| 6c | Full agent traces, admin Agent runs screen, caching checks, evals | every step recorded with arguments and results; opening a trace is audited; secrets never stored; traces expire; cached prefixes stay byte-stable |
 | 7a | Market MCP server with Tavily, egress guard, cache | client and advisor names refused; works without a key (feature off, clear message) |
 | 7b | Finalyst workflow, page, saved briefs, limits | fake-model tests of every step, revision path, budgets; Playwright run with a stubbed model |
 | 7c | Docs: architecture section + diagram, interview guide, PROGRESS | — |
@@ -111,4 +153,4 @@ Then resume and LinkedIn entries.
 
 - A Tavily API key (free account at tavily.com), saved by you in `.env` as `TAVILY_API_KEY=...`. Don't paste it
   into chat. Until it exists, the Market server answers "news search isn't set up" and everything else works.
-- Approval of this plan, or changes. I start with 6a.
+- Approved on 2026-11-13, with two additions: deliberate caching (4b) and full agent logs for admins (4).
