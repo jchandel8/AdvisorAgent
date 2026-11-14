@@ -72,6 +72,7 @@ SAMPLE_INPUTS = {
     "get_transactions": {"account_id": X, "start_date": "2025-01-01", "end_date": "2026-11-11"},
     "get_performance": {"client_id": C1},
     "find_reviews_due": {"within_days": 90},
+    "search_documents": {"query": "college savings"},
 }
 
 

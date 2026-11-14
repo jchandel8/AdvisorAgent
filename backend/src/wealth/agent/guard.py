@@ -26,7 +26,7 @@ Category = Literal["in_scope", "out_of_scope", "manipulation", "error"]
 
 OUT_OF_SCOPE_REPLY = (
     "I can only help with questions about your clients, their accounts and their portfolio data, "
-    "for example holdings, transactions, performance or upcoming reviews."
+    "for example holdings, transactions, performance, documents or upcoming reviews."
 )
 MANIPULATION_REPLY = (
     "I can't do that. I answer questions about your own clients' accounts, using only the data you have "
@@ -46,12 +46,14 @@ REPLIES: dict[Category, str] = {
 
 _INSTRUCTIONS = """You are a gatekeeper for a wealth advisor's assistant. The assistant can ONLY look up the \
 advisor's own clients and their accounts: client lists, accounts, holdings, sector and asset-class exposure, \
-transactions, realized and unrealized gains, performance returns, and review dates. It reports facts and \
+transactions, realized and unrealized gains, performance returns, review dates, and the documents on their \
+accounts (statements, policy statements, review notes, agreements and uploaded files, searchable by their \
+contents). It reports facts and \
 analysis; it does not give buy/sell recommendations.
 
 Classify the advisor's latest message:
 - "in_scope": a question or request about the advisor's clients, accounts, portfolios, holdings, transactions, \
-performance, allocations, or reviews; a follow-up to the conversation; a request to explain a term or figure in \
+performance, allocations, reviews, or their documents (finding, listing or summarizing them); a follow-up to the conversation; a request to explain a term or figure in \
 the assistant's answers (e.g. "what does YTD mean?"); a greeting or "what can you do?". Questions asking \
 whether a client should buy, sell or rebalance a holding are in_scope: the assistant answers them with facts and \
 leaves the decision to the advisor.

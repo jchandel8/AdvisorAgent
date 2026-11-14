@@ -24,10 +24,12 @@ from wealth.access import ToolContext, Viewer
 from wealth.db import read_only
 from wealth.tools.accounts import get_accounts
 from wealth.tools.clients import find_reviews_due, get_my_clients
+from wealth.tools.documents import search_documents
 from wealth.tools.holdings import get_holdings
 from wealth.tools.performance import get_performance
 from wealth.tools.schemas import (
     ClientInput,
+    DocumentSearchInput,
     HoldingsInput,
     NoInput,
     PerformanceInput,
@@ -91,6 +93,14 @@ TOOLS: dict[str, Tool] = {
             "(overdue reviews are included and flagged).",
             ReviewsInput,
             find_reviews_due,
+        ),
+        Tool(
+            "search_documents",
+            "Full-text search of documents (statements, policy statements, review notes, agreements, and files "
+            "advisors or clients uploaded) on accounts you can access, best matches first, each with a short "
+            "snippet. Optionally limit to one account or one client.",
+            DocumentSearchInput,
+            search_documents,
         ),
     ]
 }

@@ -118,3 +118,22 @@ class ReviewsInput(ToolInput):
         le=365,
         description="Reviews due from today through today + within_days. Overdue reviews are included.",
     )
+
+
+class DocumentSearchInput(ToolInput):
+    query: str = Field(
+        min_length=2,
+        max_length=200,
+        description='Words to look for, e.g. "rebalance college savings". Quotes match a phrase; -word excludes.',
+    )
+    account_id: int | None = Field(default=None, gt=0, description="Only this account's documents.")
+    client_id: int | None = Field(default=None, gt=0, description="Only documents on this client's accounts.")
+    limit: int = Field(default=5, ge=1, le=10, description="Most results to return (best matches first).")
+
+    @model_validator(mode="after")
+    def _at_most_one_scope(self):
+        if self.account_id is not None and self.client_id is not None:
+            raise ValueError("give account_id or client_id, not both")
+        if not self.query.strip():
+            raise ValueError("query must contain words")
+        return self

@@ -31,6 +31,7 @@ from fastapi.responses import Response
 from wealth.access import VISIBLE
 from wealth.api.deps import CurrentUser, current_user, get_write_conn
 from wealth.storage import Storage, get_storage
+from wealth.text_extract import extract_text
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -270,13 +271,14 @@ async def upload_document(
     data = await file.read(MAX_BYTES + 1)
     filename = clean_filename(file.filename)
     content_type = check_file(filename, data)
+    extracted = extract_text(data, content_type)  # for document search; None if the file has no readable text
     key = f"documents/{account_id}/{uuid.uuid4()}"
     row = conn.execute(
         """INSERT INTO documents (account_id, title, doc_type, size_kb, created_date, uploaded_by_advisor_id,
                                   uploaded_by_client_id, storage_key, content_type, original_filename,
-                                  size_bytes, sha256, note, uploaded_at)
+                                  size_bytes, sha256, note, uploaded_at, extracted_text)
            VALUES (%(account_id)s, %(title)s, %(doc_type)s, %(size_kb)s, %(today)s, %(advisor)s, %(client)s,
-                   %(key)s, %(content_type)s, %(filename)s, %(size)s, %(sha)s, %(note)s, now())
+                   %(key)s, %(content_type)s, %(filename)s, %(size)s, %(sha)s, %(note)s, now(), %(extracted)s)
            RETURNING id""",
         {
             "account_id": account_id,
@@ -292,6 +294,7 @@ async def upload_document(
             "size": len(data),
             "sha": hashlib.sha256(data).hexdigest(),
             "note": (note or "").strip() or None,
+            "extracted": extracted,
         },
     ).fetchone()
     _event(conn, user, row["id"], "upload")
