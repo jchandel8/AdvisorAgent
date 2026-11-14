@@ -16,12 +16,13 @@ from typing import Any, Literal
 import boto3
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from wealth.api.deps import CurrentUser, get_write_conn, require_admin
+from wealth.api.routes_documents import document_bytes, file_response
 from wealth.config import get_settings
 from wealth.datagen.generate import ALLOCATIONS
+from wealth.storage import Storage, get_storage
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -520,21 +521,27 @@ def account_detail(
 
 # --- documents ---------------------------------------------------------------------------------------
 
-DOC_TYPES = ("ips", "review_notes", "statement", "agreement")
+DOC_TYPES = ("ips", "review_notes", "statement", "agreement", "other")
 
 DOCUMENT_LIST_SQL = """
-    SELECT d.id AS document_id, d.title, d.doc_type, d.size_kb, d.created_date,
+    SELECT d.id AS document_id, d.title, d.doc_type, d.size_kb, d.created_date, d.uploaded_at, d.deleted_at,
+           d.note, d.content_type, d.original_filename,
            a.id AS account_id, a.account_name,
-           u.id AS uploaded_by_id, u.first_name || ' ' || u.last_name AS uploaded_by
+           CASE WHEN d.uploaded_by_client_id IS NOT NULL THEN 'client'
+                WHEN d.uploaded_by_advisor_id IS NOT NULL THEN 'advisor' END AS uploaded_by_type,
+           coalesce(d.uploaded_by_client_id, d.uploaded_by_advisor_id) AS uploaded_by_id,
+           coalesce(uc.first_name || ' ' || uc.last_name, u.first_name || ' ' || u.last_name) AS uploaded_by,
+           (d.storage_key IS NULL OR d.content_type LIKE 'text/plain%%') AS previewable
     FROM documents d
     JOIN accounts a ON a.id = d.account_id
-    LEFT JOIN advisors u ON u.id = d.uploaded_by_advisor_id"""
+    LEFT JOIN advisors u ON u.id = d.uploaded_by_advisor_id
+    LEFT JOIN clients uc ON uc.id = d.uploaded_by_client_id"""
 
 
 @router.get("/documents")
 def list_documents(
     q: str = Query(default="", max_length=100),
-    doc_type: Literal["ips", "review_notes", "statement", "agreement"] | None = None,
+    doc_type: Literal["ips", "review_notes", "statement", "agreement", "other"] | None = None,
     page: int = Query(default=1, ge=1, le=10_000),
     admin: CurrentUser = Depends(require_admin),
     conn=Depends(get_write_conn),
@@ -597,36 +604,39 @@ def _record_open(conn, admin: CurrentUser, doc: dict, action: str) -> None:
 
 @router.get("/documents/{document_id}/content")
 def document_content(
-    document_id: int, admin: CurrentUser = Depends(require_admin), conn=Depends(get_write_conn)
+    document_id: int,
+    admin: CurrentUser = Depends(require_admin),
+    conn=Depends(get_write_conn),
+    storage: Storage | None = Depends(get_storage),
 ):
-    """The document's text, for the preview. Recorded in the audit log in the same transaction."""
+    """The document's text, for the preview (text documents only). Recorded in the audit log."""
     doc = _document(conn, document_id)
+    if not doc["previewable"]:
+        raise HTTPException(409, "Only text documents can be previewed here. Download this one instead.")
+    data, _, _ = document_bytes(_stored(conn, document_id), storage)
     _record_open(conn, admin, doc, "view_document")
-    text = conn.execute("SELECT text FROM documents WHERE id = %s", (document_id,)).fetchone()["text"]
-    return {"document_id": document_id, "text": text}
+    return {"document_id": document_id, "text": data.decode("utf-8", errors="replace")}
 
 
-def _filename(title: str, document_id: int) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60] or "document"
-    return f"{slug}-{document_id}.txt"
+def _stored(conn, document_id: int) -> dict:
+    return conn.execute(
+        "SELECT id, title, text, storage_key, content_type, original_filename FROM documents WHERE id = %s",
+        (document_id,),
+    ).fetchone()
 
 
 @router.get("/documents/{document_id}/download")
 def download_document(
-    document_id: int, admin: CurrentUser = Depends(require_admin), conn=Depends(get_write_conn)
+    document_id: int,
+    admin: CurrentUser = Depends(require_admin),
+    conn=Depends(get_write_conn),
+    storage: Storage | None = Depends(get_storage),
 ):
-    """The document as a .txt file. Recorded in the audit log in the same transaction."""
+    """The document's file (seeded documents as .txt). Recorded in the audit log in the same transaction."""
     doc = _document(conn, document_id)
+    data, content_type, filename = document_bytes(_stored(conn, document_id), storage)
     _record_open(conn, admin, doc, "download_document")
-    text = conn.execute("SELECT text FROM documents WHERE id = %s", (document_id,)).fetchone()["text"]
-    return Response(
-        content=text.encode("utf-8"),
-        media_type="text/plain; charset=utf-8",
-        headers={
-            "Content-Disposition": f'attachment; filename="{_filename(doc["title"], document_id)}"',
-            "Cache-Control": "no-store",
-        },
-    )
+    return file_response(data=data, content_type=content_type, filename=filename, inline=False)
 
 
 # --- logs --------------------------------------------------------------------------------------------

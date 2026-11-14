@@ -16,6 +16,7 @@ from psycopg import sql
 from psycopg.rows import dict_row
 
 from tests.fixtures import load_fixture
+from wealth import storage
 from wealth.config import get_settings
 from wealth.migrate import migrate
 
@@ -67,8 +68,11 @@ def isolated_auth_settings(monkeypatch):
         "ANTHROPIC_MODEL",
         "GUARD_MODEL",
         "BEDROCK_REGION",
+        "DOCUMENTS_BUCKET",
+        "S3_ENDPOINT_URL",
     ):
         monkeypatch.setenv(name, "")
     get_settings.cache_clear()
+    storage._s3.cache_clear()
     yield
     get_settings.cache_clear()

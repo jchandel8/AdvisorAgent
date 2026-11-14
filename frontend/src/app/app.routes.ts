@@ -12,6 +12,7 @@ const clientShell: ShellData = {
     { path: '/client/holdings', label: 'Holdings', icon: 'layers' },
     { path: '/client/transactions', label: 'Transactions', icon: 'transfer' },
     { path: '/client/performance', label: 'Performance', icon: 'trend' },
+    { path: '/client/documents', label: 'Documents', icon: 'file', badge: 'documents' },
     { path: '/client/profile', label: 'Profile', icon: 'user' },
   ],
 };
@@ -23,6 +24,7 @@ const advisorShell: ShellData = {
     { path: '/advisor/dashboard', label: 'Dashboard', icon: 'users' },
     { path: '/advisor/accounts', label: 'Accounts', icon: 'briefcase' },
     { path: '/advisor/assistant', label: 'Assistant', icon: 'chat' },
+    { path: '/advisor/documents', label: 'Documents', icon: 'file', badge: 'documents' },
     { path: '/advisor/profile', label: 'Profile', icon: 'user' },
   ],
 };
@@ -41,6 +43,7 @@ const adminShell: ShellData = {
 };
 
 const profile = () => import('./pages/profile').then((m) => m.Profile);
+const documents = () => import('./pages/documents').then((m) => m.Documents);
 
 export const routes: Routes = [
   {
@@ -86,6 +89,7 @@ export const routes: Routes = [
         title: 'Performance · Client portal',
         loadComponent: () => import('./pages/client/performance').then((m) => m.ClientPerformance),
       },
+      { path: 'documents', title: 'Documents · Client portal', loadComponent: documents },
       { path: 'profile', title: 'Profile · Client portal', loadComponent: profile },
     ],
   },
@@ -111,6 +115,7 @@ export const routes: Routes = [
         title: 'Assistant · Advisor portal',
         loadComponent: () => import('./pages/advisor/assistant').then((m) => m.Assistant),
       },
+      { path: 'documents', title: 'Documents · Advisor portal', loadComponent: documents },
       { path: 'profile', title: 'Profile · Advisor portal', loadComponent: profile },
     ],
   },

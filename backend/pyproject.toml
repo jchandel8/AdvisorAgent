@@ -14,6 +14,7 @@ dependencies = [
     "pyjwt[crypto]>=2.9",
     "cryptography>=46,<49", # 49+ has no Intel-macOS wheels; Linux images are unaffected
     "boto3>=1.35",
+    "python-multipart>=0.0.20",
 ]
 
 [project.scripts]
@@ -49,4 +50,4 @@ ignore = ["E501"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's dependency-injection markers are meant to be used as argument defaults.
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", "fastapi.params.Depends"]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", "fastapi.Form", "fastapi.File", "fastapi.params.Depends"]
