@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse
 from wealth.api import routes_admin, routes_advisor, routes_client, routes_common, routes_documents
 from wealth.config import get_settings, running_on_aws
 from wealth.db import close_pools
-from wealth.mcp import analytics, portfolio
+from wealth.mcp import analytics, market, portfolio
 
 
 def check_startup_config() -> None:
@@ -51,7 +51,11 @@ def create_app() -> FastAPI:
     app.include_router(routes_documents.router)
     # MCP servers for the agents. Only reachable from inside this process (see wealth/mcp/guard.py).
     app.state.mcp_apps = []
-    for path, module in (("/mcp/portfolio", portfolio), ("/mcp/analytics", analytics)):
+    for path, module in (
+        ("/mcp/portfolio", portfolio),
+        ("/mcp/analytics", analytics),
+        ("/mcp/market", market),
+    ):
         guarded, inner = module.asgi_app()
         app.mount(path, guarded)
         app.state.mcp_apps.append(inner)

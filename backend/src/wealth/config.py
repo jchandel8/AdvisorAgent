@@ -46,6 +46,7 @@ class Settings:
     s3_endpoint_url: str | None  # local only: the local S3 server address; unset on AWS (real S3)
     s3_region: str
     mcp_base_url: str  # where the agent reaches this app's own MCP servers (loopback, inside the container)
+    tavily_api_key: str | None  # news search for the Market MCP server (step 7a); None = news search off
 
     @property
     def demo_auth_enabled(self) -> bool:
@@ -109,6 +110,7 @@ def get_settings() -> Settings:
         s3_endpoint_url=os.environ.get("S3_ENDPOINT_URL", "").strip() or None,
         s3_region=os.environ.get("AWS_REGION", "").strip() or "us-west-1",
         mcp_base_url=os.environ.get("MCP_BASE_URL", "").strip() or "http://127.0.0.1:8000",
+        tavily_api_key=os.environ.get("TAVILY_API_KEY", "").strip() or None,
     )
 
 

@@ -15,7 +15,8 @@ Handoff notes so work can resume in any session. Update at the end of every step
 | 6a. MCP servers (Portfolio, Analytics); assistant uses MCP | **Done on branch `feature/mcp-servers`** (2026-11-13): 341 backend tests. Not merged yet |
 | 6b. Document search (`search_documents`, 7th tool) | **Done on branch `feature/document-search`** (2026-11-13): 366 backend tests. 6a merged to main |
 | 6c. Full agent traces, admin Agent runs, caching, evals | **Done, merged** (2026-11-14): 387 backend, 15 frontend, 8 e2e tests; assistant eval 19/19 |
-| 7 (AI Finalyst) | Next. Planned in `docs/finalyst-plan.md` (approved 2026-11-13 with full admin traces + caching added) |
+| 7a. Market MCP server (news via Tavily, egress guard, 6h cache, sector moves) | **Done, merged** (2026-11-14): 400 backend tests; live Tavily search verified |
+| 7b, 7c (Finalyst workflow + page, docs) | Next. Planned in `docs/finalyst-plan.md` (approved 2026-11-13 with full admin traces + caching added) |
 
 ## How to run (local)
 
