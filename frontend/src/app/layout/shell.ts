@@ -1,14 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
   ActivatedRoute,
+  NavigationEnd,
   Router,
   RouterLink,
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-import { map } from 'rxjs';
+import { filter, map } from 'rxjs';
 import { Auth } from '../core/auth';
+import { DocCount } from '../core/doc-count';
 import { Session } from '../core/session';
 import { Theme } from '../core/theme';
 import { Icon, IconName } from '../shared/ui';
@@ -17,6 +19,8 @@ export interface NavItem {
   path: string;
   label: string;
   icon: IconName;
+  /** 'documents': show how many shared documents wait for this person. */
+  badge?: 'documents';
 }
 
 export interface ShellData {
@@ -72,6 +76,12 @@ export interface ShellData {
                 >
                   <app-icon [name]="item.icon" />
                   {{ item.label }}
+                  @if (item.badge && docCount.count()) {
+                    <span
+                      class="num ml-auto rounded-full bg-ink px-2 text-xs leading-5 font-semibold text-paper"
+                      >{{ docCount.count() }}<span class="sr-only"> new</span></span
+                    >
+                  }
                 </a>
               </li>
             }
@@ -135,7 +145,15 @@ export interface ShellData {
               [class.text-admin]="rla.isActive && portal() === 'admin'"
               [class.font-semibold]="rla.isActive"
             >
-              <app-icon [name]="item.icon" [size]="20" />
+              <span class="relative">
+                <app-icon [name]="item.icon" [size]="20" />
+                @if (item.badge && docCount.count()) {
+                  <span
+                    class="num absolute -top-1.5 -right-2.5 rounded-full bg-ink px-1.5 text-[0.6875rem] leading-4 font-semibold text-paper"
+                    >{{ docCount.count() }}<span class="sr-only"> new</span></span
+                  >
+                }
+              </span>
               {{ item.label }}
             </a>
           </li>
@@ -156,6 +174,21 @@ export class Shell {
   });
   protected readonly portal = computed(() => this.data().portal);
   protected readonly user = this.session.user;
+  protected readonly docCount = inject(DocCount);
+
+  constructor() {
+    // Re-count waiting documents on every page change (advisor and client portals only).
+    const hasBadge = () => this.data().nav.some((n) => n.badge === 'documents');
+    if (hasBadge()) this.docCount.refresh();
+    this.router.events
+      .pipe(
+        filter((e) => e instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => {
+        if (hasBadge()) this.docCount.refresh();
+      });
+  }
 
   protected switchUser(): void {
     if (this.auth.mode() === 'cognito') {

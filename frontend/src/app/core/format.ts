@@ -57,6 +57,7 @@ export const docTypeLabel: Record<string, string> = {
   review_notes: 'Review notes',
   statement: 'Statement',
   agreement: 'Agreement',
+  other: 'Other',
 };
 
 export const roleLabel: Record<string, string> = {

@@ -79,7 +79,12 @@ const DOC_TYPES = Object.entries(docTypeLabel).map(([value, label]) => ({ value,
             <tbody>
               @for (r of d.documents; track r.document_id) {
                 <tr class="border-t border-rule">
-                  <th scope="row" class="px-4 py-3 text-left font-medium">{{ r.title }}</th>
+                  <th scope="row" class="px-4 py-3 text-left font-medium">
+                    {{ r.title }}
+                    @if (r.deleted_at) {
+                      <span class="ml-1 text-sm font-normal text-ink-muted">(deleted)</span>
+                    }
+                  </th>
                   <td class="px-4 py-3">{{ docType[r.doc_type] ?? r.doc_type }}</td>
                   <td class="max-w-56 px-4 py-2">
                     <a
@@ -94,9 +99,10 @@ const DOC_TYPES = Object.entries(docTypeLabel).map(([value, label]) => ({ value,
                     @if (r.uploaded_by_id) {
                       <a
                         class="inline-flex min-h-11 items-center hover:underline"
-                        [routerLink]="['/admin/users', 'advisor', r.uploaded_by_id]"
+                        [routerLink]="['/admin/users', r.uploaded_by_type ?? 'advisor', r.uploaded_by_id]"
                         >{{ r.uploaded_by }}</a
                       >
+                      <span class="text-sm text-ink-muted">({{ r.uploaded_by_type }})</span>
                     } @else {
                       <span class="text-ink-muted">—</span>
                     }
@@ -189,26 +195,33 @@ export class AdminDocuments {
       <header class="mt-2 flex flex-wrap items-end justify-between gap-4">
         <div class="space-y-1">
           <h1 class="text-[1.75rem] font-semibold">{{ d.title }}</h1>
-          <p class="text-ink-muted">{{ docType[d.doc_type] ?? d.doc_type }}, document #{{ d.document_id }}</p>
+          <p class="text-ink-muted">
+            {{ docType[d.doc_type] ?? d.doc_type }}, document #{{ d.document_id }}
+            @if (d.deleted_at) {
+              <span class="font-medium text-ink">, deleted by the uploader {{ fmt(d.deleted_at) }}</span>
+            }
+          </p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <button
-            type="button"
-            class="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-rule-strong bg-surface px-4 font-medium hover:bg-surface-sunk disabled:opacity-60"
-            [disabled]="busy()"
-            [attr.aria-expanded]="preview() !== null"
-            aria-controls="doc-preview"
-            (click)="togglePreview(d.document_id)"
-          >
-            <app-icon name="eye" /> {{ preview() !== null ? 'Hide preview' : 'Preview' }}
-          </button>
+          @if (d.previewable) {
+            <button
+              type="button"
+              class="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-rule-strong bg-surface px-4 font-medium hover:bg-surface-sunk disabled:opacity-60"
+              [disabled]="busy()"
+              [attr.aria-expanded]="preview() !== null"
+              aria-controls="doc-preview"
+              (click)="togglePreview(d.document_id)"
+            >
+              <app-icon name="eye" /> {{ preview() !== null ? 'Hide preview' : 'Preview' }}
+            </button>
+          }
           <button
             type="button"
             class="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] bg-admin px-4 font-medium text-paper hover:opacity-90 disabled:opacity-60"
             [disabled]="busy()"
             (click)="download(d)"
           >
-            <app-icon name="download" /> {{ busy() === 'download' ? 'Downloading…' : 'Download .txt' }}
+            <app-icon name="download" /> {{ busy() === 'download' ? 'Downloading…' : 'Download' }}
           </button>
         </div>
       </header>
@@ -237,19 +250,33 @@ export class AdminDocuments {
           <dt class="text-ink-muted">Uploaded by</dt>
           <dd>
             @if (d.uploaded_by_id) {
-              <a class="hover:underline" [routerLink]="['/admin/users', 'advisor', d.uploaded_by_id]"
+              <a
+                class="hover:underline"
+                [routerLink]="['/admin/users', d.uploaded_by_type ?? 'advisor', d.uploaded_by_id]"
                 >{{ d.uploaded_by }}</a
               >
-              <span class="text-ink-muted"> (advisor)</span>
+              <span class="text-ink-muted"> ({{ d.uploaded_by_type }})</span>
             } @else {
               —
             }
           </dd>
         </div>
         <div class="grid gap-1 px-5 py-4 sm:grid-cols-[12rem_1fr] sm:gap-4">
-          <dt class="text-ink-muted">Document date</dt>
-          <dd>{{ dateLong(d.created_date) }}</dd>
+          <dt class="text-ink-muted">{{ d.uploaded_at ? 'Uploaded' : 'Document date' }}</dt>
+          <dd>{{ d.uploaded_at ? fmt(d.uploaded_at) : dateLong(d.created_date) }}</dd>
         </div>
+        @if (d.original_filename) {
+          <div class="grid gap-1 px-5 py-4 sm:grid-cols-[12rem_1fr] sm:gap-4">
+            <dt class="text-ink-muted">File</dt>
+            <dd class="break-words">{{ d.original_filename }}</dd>
+          </div>
+        }
+        @if (d.note) {
+          <div class="grid gap-1 px-5 py-4 sm:grid-cols-[12rem_1fr] sm:gap-4">
+            <dt class="text-ink-muted">Note</dt>
+            <dd class="break-words">{{ d.note }}</dd>
+          </div>
+        }
         <div class="grid gap-1 px-5 py-4 sm:grid-cols-[12rem_1fr] sm:gap-4">
           <dt class="text-ink-muted">Last opened</dt>
           <dd>
@@ -364,7 +391,7 @@ export class AdminDocumentDetail {
     this.api.downloadDocument(d.document_id).subscribe({
       next: (res) => {
         this.busy.set(null);
-        const name = filenameFrom(res.headers.get('Content-Disposition'), `document-${d.document_id}.txt`);
+        const name = filenameFrom(res.headers.get('Content-Disposition'), `document-${d.document_id}`);
         if (res.body) saveBlob(res.body, name);
         this.downloaded.set(`Downloaded ${name}.`);
         this.doc.reload();

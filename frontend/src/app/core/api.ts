@@ -9,6 +9,8 @@ import {
   AdminUser,
   DocumentDetail,
   DocumentPage,
+  SharedDocuments,
+  UploadAccount,
   UserDetail,
   UserKind,
   AssistantEvent,
@@ -110,6 +112,31 @@ export class Api {
     client_id: number | null;
   }): Observable<AssistantReply> {
     return this.http.post<AssistantReply>('/api/advisor/assistant/messages', body);
+  }
+
+  // Documents (advisor and client portals)
+  documents(): Observable<SharedDocuments> {
+    return this.http.get<SharedDocuments>('/api/documents');
+  }
+  documentsNewCount(): Observable<{ new_count: number }> {
+    return this.http.get<{ new_count: number }>('/api/documents/new-count');
+  }
+  uploadAccounts(): Observable<{ accounts: UploadAccount[] }> {
+    return this.http.get<{ accounts: UploadAccount[] }>('/api/documents/accounts');
+  }
+  uploadDocument(form: FormData): Observable<{ document_id: number; title: string }> {
+    return this.http.post<{ document_id: number; title: string }>('/api/documents', form);
+  }
+  /** The file, through HttpClient so the sign-in token is sent. Opening is recorded by the server. */
+  documentFile(id: number, inline: boolean): Observable<HttpResponse<Blob>> {
+    return this.http.get(`/api/documents/${id}/file`, {
+      params: this.params({ disposition: inline ? 'inline' : 'attachment' }),
+      observe: 'response',
+      responseType: 'blob',
+    });
+  }
+  deleteDocument(id: number): Observable<{ deleted: number }> {
+    return this.http.delete<{ deleted: number }>(`/api/documents/${id}`);
   }
 
   // Admin portal

@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
-from wealth.api import routes_admin, routes_advisor, routes_client, routes_common
+from wealth.api import routes_admin, routes_advisor, routes_client, routes_common, routes_documents
 from wealth.config import get_settings, running_on_aws
 from wealth.db import close_pools
 
@@ -43,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_client.router)
     app.include_router(routes_advisor.router)
     app.include_router(routes_admin.router)
+    app.include_router(routes_documents.router)
     static_dir = os.environ.get("STATIC_DIR", "").strip()
     if static_dir and Path(static_dir).is_dir():
         _serve_frontend(app, Path(static_dir))

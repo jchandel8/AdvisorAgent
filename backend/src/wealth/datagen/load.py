@@ -23,6 +23,7 @@ TABLES = [
     "agent_conversations",
     "demo_users",
     "answer_cache",
+    "document_events",
     "documents",
     "performance",
     "transactions",

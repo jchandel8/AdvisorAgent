@@ -125,7 +125,11 @@ import { Empty, ErrorState, Icon, Loading, Swatch } from '../../shared/ui';
                     <th scope="row" class="px-4 py-3 text-left font-medium">{{ d.title }}</th>
                     <td class="px-4 py-3">{{ docType[d.doc_type] ?? d.doc_type }}</td>
                     <td class="num px-4 py-3 whitespace-nowrap">{{ dateShort(d.created_date) }}</td>
-                    <td class="px-4 py-3 text-ink-muted">{{ d.uploaded_by || '—' }}</td>
+                    <td class="px-4 py-3 text-ink-muted">
+                      {{ d.uploaded_by || '—' }}{{ d.uploaded_by_type ? ' (' + d.uploaded_by_type + ')' : '' }}{{
+                        d.deleted_at ? ', deleted' : ''
+                      }}
+                    </td>
                     <td class="px-4 py-2 text-right">
                       <a
                         class="inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3 text-sm whitespace-nowrap text-admin hover:bg-admin-soft"

@@ -42,6 +42,9 @@ class Settings:
     assistant_per_minute: int
     assistant_per_day: int
     assistant_guard_enabled: bool
+    documents_bucket: str | None  # S3 bucket for uploaded documents (a local S3 server in docker compose)
+    s3_endpoint_url: str | None  # local only: the local S3 server address; unset on AWS (real S3)
+    s3_region: str
 
     @property
     def demo_auth_enabled(self) -> bool:
@@ -101,6 +104,9 @@ def get_settings() -> Settings:
         assistant_per_minute=int(os.environ.get("ASSISTANT_PER_MINUTE", "").strip() or 10),
         assistant_per_day=int(os.environ.get("ASSISTANT_PER_DAY", "").strip() or 100),
         assistant_guard_enabled=os.environ.get("ASSISTANT_GUARD_ENABLED", "true").strip().lower() != "false",
+        documents_bucket=os.environ.get("DOCUMENTS_BUCKET", "").strip() or None,
+        s3_endpoint_url=os.environ.get("S3_ENDPOINT_URL", "").strip() or None,
+        s3_region=os.environ.get("AWS_REGION", "").strip() or "us-west-1",
     )
 
 

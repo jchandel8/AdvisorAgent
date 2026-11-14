@@ -115,6 +115,20 @@ demo_users.csv     generated; demo users first (DEMO notes); no passwords
   UI: names in Users and Accounts link to `/admin/users/:kind/:id` and `/admin/accounts/:id`; new
   Documents nav item, `/admin/documents` and `/admin/documents/:id` (Preview, Download .txt via HttpClient blob
   so the token is sent). E2E: admin clicks client -> account -> document -> download.
+- **Document sharing (2026-11-13, branch feature/document-sharing, built on feature/admin-drilldowns):**
+  advisors and clients upload to an account they can access (not as a viewer; open accounts only), and
+  everyone with access sees it. `routes_documents.py`: `GET /api/documents` (via access.VISIBLE, with
+  `is_new`, `mine`, `opened_by`), `/new-count`, `/accounts` (uploadable), `POST` (multipart; 10 MB; PDF, TXT,
+  PNG, JPG, DOCX; contents checked against the type; filename cleaned; row + event + S3 put in one
+  transaction), `/{id}/file?disposition=inline|attachment` (streamed by the API: no-store, nosniff,
+  CSP sandbox; records view/download), `DELETE` (uploader only; soft delete). Migration 007: upload columns on
+  `documents` (one uploader, file facts required), type `other`, `document_events`. Storage `wealth/storage.py`:
+  S3 on AWS (task role, bucket `advisoragent-documents-<account>`, private, AES256, TLS-only, force_destroy,
+  policy `document-files` = Put/Get on documents/*), locally `adobe/s3mock` in compose (MinIO images are no
+  longer published). The API streams files instead of presigned URLs: one code path, no public bucket URL.
+  New-count badge on the Documents menu (refreshed on navigation). Admin screens show uploads (client or
+  advisor uploader, deleted marker); admin preview only for text. Tests: 30 in test_documents.py; E2E advisor
+  uploads, client (private window) sees New + menu count, downloads, advisor sees "opened by", deletes.
 
 ## Step 5: AWS deploy (code written, NOT applied)
 

@@ -81,6 +81,56 @@ resource "aws_db_instance" "db" {
   apply_immediately           = true
 }
 
+# --- Document files ---------------------------------------------------------------------------------
+# Uploaded documents. Private (all public access blocked, owner-enforced, TLS only), encrypted at rest. Part of
+# the disposable demo: Tear down empties and deletes it (force_destroy), like the database. The API streams
+# files itself, so nothing is ever served from the bucket directly.
+
+resource "aws_s3_bucket" "documents" {
+  bucket        = "advisoragent-documents-${data.aws_caller_identity.current.account_id}"
+  force_destroy = true
+}
+
+resource "aws_s3_bucket_public_access_block" "documents" {
+  bucket                  = aws_s3_bucket.documents.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_ownership_controls" "documents" {
+  bucket = aws_s3_bucket.documents.id
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "documents" {
+  bucket = aws_s3_bucket.documents.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "documents_tls_only" {
+  bucket     = aws_s3_bucket.documents.id
+  depends_on = [aws_s3_bucket_public_access_block.documents]
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "DenyInsecureTransport"
+      Effect    = "Deny"
+      Principal = "*"
+      Action    = "s3:*"
+      Resource  = [aws_s3_bucket.documents.arn, "${aws_s3_bucket.documents.arn}/*"]
+      Condition = { Bool = { "aws:SecureTransport" = "false" } }
+    }]
+  })
+}
+
 # --- IAM -------------------------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "ecs_tasks_trust" {
@@ -189,6 +239,21 @@ resource "aws_iam_role_policy" "task_bedrock" {
   })
 }
 
+# Documents: read and write files under documents/ in the one bucket. No delete (deleting a document hides it),
+# no listing, no other bucket.
+resource "aws_iam_role_policy" "task_documents" {
+  name = "document-files"
+  role = aws_iam_role.task.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["s3:PutObject", "s3:GetObject"]
+      Resource = "${aws_s3_bucket.documents.arn}/documents/*"
+    }]
+  })
+}
+
 # --- Service ---------------------------------------------------------------------------------------
 
 resource "aws_cloudwatch_log_group" "app" {
@@ -239,6 +304,10 @@ resource "aws_ecs_express_gateway_service" "app" {
     environment {
       name  = "COGNITO_DOMAIN"
       value = var.cognito_domain
+    }
+    environment {
+      name  = "DOCUMENTS_BUCKET"
+      value = aws_s3_bucket.documents.bucket
     }
     environment {
       name  = "LLM_PROVIDER"
@@ -293,6 +362,7 @@ resource "aws_ecs_express_gateway_service" "app" {
     aws_iam_role_policy_attachment.execution_base,
     aws_iam_role_policy.execution_secrets,
     aws_iam_role_policy.task_bedrock,
+    aws_iam_role_policy.task_documents,
   ]
 }
 

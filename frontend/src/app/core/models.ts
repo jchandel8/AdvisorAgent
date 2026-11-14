@@ -315,10 +315,17 @@ export interface AdminDocument {
   doc_type: string;
   size_kb: number;
   created_date: string;
+  uploaded_at: string | null;
+  deleted_at: string | null;
+  note: string | null;
+  content_type: string | null;
+  original_filename: string | null;
   account_id: number;
   account_name: string;
+  uploaded_by_type: 'advisor' | 'client' | null;
   uploaded_by_id: number | null;
   uploaded_by: string | null;
+  previewable: boolean;
 }
 
 export interface DocumentPage {
@@ -359,4 +366,38 @@ export interface Paged<T> {
   page_size: number;
   total_rows: number;
   events: T[];
+}
+
+// ---- Shared documents (advisor and client portals) ------------------------------------------------------
+
+export interface SharedDocument {
+  document_id: number;
+  title: string;
+  doc_type: string;
+  note: string | null;
+  created_date: string;
+  uploaded_at: string | null;
+  size_kb: number;
+  content_type: string | null;
+  original_filename: string | null;
+  account_id: number;
+  account_name: string;
+  uploaded_by_type: 'advisor' | 'client' | null;
+  uploaded_by: string | null;
+  mine: boolean;
+  is_new: boolean;
+  opened_by: string | null;
+}
+
+export interface SharedDocuments {
+  new_count: number;
+  documents: SharedDocument[];
+}
+
+export interface UploadAccount {
+  account_id: number;
+  account_name: string;
+  account_type: string;
+  role: string;
+  clients: string | null;
 }

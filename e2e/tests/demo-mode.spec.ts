@@ -122,7 +122,52 @@ test('admin drills down from a client to an account to a document and downloads 
   await expect(page).toHaveURL(/\/admin\/documents\/\d+$/);
   await expect(page.getByText('Uploaded by')).toBeVisible();
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download .txt' }).click();
+  await page.getByRole('button', { name: 'Download', exact: true }).click();
   expect((await download).suggestedFilename()).toMatch(/^[a-z0-9-]+-\d+\.txt$/);
   await expect(page.getByRole('table', { name: /Previews and downloads/ })).toContainText('Downloaded');
+});
+
+test('advisor shares a document, the client reviews it, the advisor sees it was opened', async ({ browser }) => {
+  const advisor = await (await browser.newContext()).newPage();
+  const client = await (await browser.newContext()).newPage(); // a private window
+  await pick(advisor, 'Anthony Gonzalez');
+  await pick(client, 'Kevin Keith');
+  const title = `Rebalance proposal ${Date.now()}`;
+
+  // Advisor uploads to one of Kevin's shared accounts.
+  await advisor.goto('/advisor/documents');
+  await advisor.getByRole('button', { name: 'Upload a document' }).click();
+  const account = advisor.locator('#upload-account');
+  const option = account.locator('option', { hasText: /Kevin Keith.*Roth IRA/ });
+  await account.selectOption((await option.getAttribute('value'))!);
+  await advisor.getByLabel('Title').fill(title);
+  await advisor.getByLabel('File').setInputFiles({
+    name: 'proposal.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Move 5% from tech into bonds.'),
+  });
+  await advisor.getByRole('button', { name: 'Upload', exact: true }).click();
+  await expect(advisor.getByRole('status')).toContainText(`Shared ${title}`);
+  const advisorRow = advisor.getByRole('row', { name: new RegExp(title) });
+  await expect(advisorRow).toContainText('Not opened yet');
+
+  // Client sees it as new (row and menu count), opens it, and it's no longer new.
+  await client.goto('/client/documents');
+  const clientRow = client.getByRole('row', { name: new RegExp(title) });
+  await expect(clientRow).toContainText('New');
+  await expect(clientRow).toContainText('Anthony Gonzalez');
+  await expect(client.getByRole('link', { name: /Documents \d+ new/ }).first()).toBeVisible();
+  const download = client.waitForEvent('download');
+  await clientRow.getByRole('button', { name: /^Download / }).click();
+  expect((await download).suggestedFilename()).toBe('proposal.txt');
+  await expect(clientRow).not.toContainText('New');
+
+  // The advisor sees who reviewed it, then deletes it (restores the starting state).
+  await advisor.reload();
+  await expect(advisorRow).toContainText('Kevin Keith');
+  await advisorRow.getByRole('button', { name: /^Delete / }).click();
+  await advisorRow.getByRole('button', { name: 'Confirm delete' }).click();
+  await expect(advisor.getByRole('status')).toContainText(`Deleted ${title}`);
+  await client.reload();
+  await expect(client.getByRole('row', { name: new RegExp(title) })).toHaveCount(0);
 });
