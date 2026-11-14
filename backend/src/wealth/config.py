@@ -45,6 +45,7 @@ class Settings:
     documents_bucket: str | None  # S3 bucket for uploaded documents (a local S3 server in docker compose)
     s3_endpoint_url: str | None  # local only: the local S3 server address; unset on AWS (real S3)
     s3_region: str
+    mcp_base_url: str  # where the agent reaches this app's own MCP servers (loopback, inside the container)
 
     @property
     def demo_auth_enabled(self) -> bool:
@@ -107,6 +108,7 @@ def get_settings() -> Settings:
         documents_bucket=os.environ.get("DOCUMENTS_BUCKET", "").strip() or None,
         s3_endpoint_url=os.environ.get("S3_ENDPOINT_URL", "").strip() or None,
         s3_region=os.environ.get("AWS_REGION", "").strip() or "us-west-1",
+        mcp_base_url=os.environ.get("MCP_BASE_URL", "").strip() or "http://127.0.0.1:8000",
     )
 
 

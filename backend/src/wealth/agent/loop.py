@@ -1,8 +1,9 @@
 """The agent loop: send the conversation to Claude, run any tools it asks for, repeat until it answers.
 
-Security: the advisor_id comes from the session (the CLI flag now, the verified login token later).
-The model never sees or supplies it. Every tool call goes through execute_tool(), which validates the
-model's input and injects the session's advisor_id.
+Security: the advisor_id comes from the session (the verified login token; the CLI flag in the terminal).
+The model never sees or supplies it. Tools run through a ToolRunner (wealth/mcp/client.py): in the app,
+the Portfolio MCP server, which receives the advisor in a signed internal token; in tests and the CLI,
+directly. Both end in execute_tool(), which validates the model's input and injects the advisor_id.
 
 Cost controls:
 - Answer cache (ours): an exact repeat of a conversation for the same advisor and permissions is answered
@@ -30,7 +31,7 @@ from wealth.agent.guard import UNVERIFIED_REPLY, ScopeGuard, unverified_figures
 from wealth.agent.prompts import system_prompt
 from wealth.config import get_settings
 from wealth.db import connection, read_only
-from wealth.tools.registry import execute_tool, tool_definitions
+from wealth.mcp.client import LocalToolRunner, McpToolRunner, ToolRunner
 
 MAX_TOOL_ROUNDS = 10  # hard stop on runaway loops (cost control)
 MAX_TOKENS = 16000
@@ -100,6 +101,7 @@ class AdvisorAgent:
         transcript: list[str] | None = None,
         guard: ScopeGuard | None = None,  # scope check before the main model (None = off, e.g. some tests)
         advisor_name: str | None = None,  # shown to the scope check so it can spot other advisors' names
+        tools: ToolRunner | None = None,  # default: MCP in the app; local when a test connection is given
     ):
         self.advisor_id = advisor_id
         self.client = client
@@ -118,7 +120,8 @@ class AdvisorAgent:
         self._system = [
             {"type": "text", "text": system_prompt(self.today), "cache_control": {"type": "ephemeral"}}
         ]
-        self._tools = tool_definitions()
+        self.tools = tools or (LocalToolRunner(conn) if conn is not None else McpToolRunner())
+        self._tools = self.tools.definitions()
         self._prompt_fingerprint = hashlib.sha256(
             json.dumps([self._system[0]["text"], self._tools], sort_keys=True).encode()
         ).hexdigest()
@@ -269,12 +272,11 @@ class AdvisorAgent:
             for block in response.content:
                 if block.type != "tool_use":
                     continue
-                output = execute_tool(
+                output = self.tools.call(
                     block.name,
                     block.input,
                     advisor_id=self.advisor_id,
                     today=self.today,
-                    conn=self.conn,
                     focus_client_id=focus_client_id,
                 )
                 is_error = "error" in output

@@ -11,7 +11,9 @@ Handoff notes so work can resume in any session. Update at the end of every step
 | 3. Cognito login, Playwright E2E | **Done** (2026-11-12). Cognito pool `us-west-1_yZ66inLgw` created with the owner's permission. Owner still to run `wealth.ops.demo_logins --apply` |
 | 4. Admin portal, audit log, demo page, reset script | **Done** (2026-11-12): 227 backend, 9 frontend, 6 browser tests |
 | 5. AWS deploy (ECS Express, RDS, Secrets Manager), IaC, CI | **Deployed** (2026-11-13): https://ad-4e693211c8514b9389b0a39a34b07394.ecs.us-west-1.on.aws (Cognito callbacks added). Fixes found on the way: OIDC subject now has owner/repo IDs; Express needs `log_stream_prefix`; set `auto_scaling_metric`/`target_value` (provider 6.73 bug) and untainted the service. Default VPC egress works (no NAT). Next: owner tests phase 9 |
-| 6. MCP server, document search, guardrails, evals, tracing, rate limits | Not started |
+| Extras after 5 | Bedrock on AWS (Sonnet 4.6 / Haiku 4.5); admin drilldowns + Documents; document sharing (S3). Merged to main 2026-11-13; AWS torn down, next deploy needs the owner's yes |
+| 6a. MCP servers (Portfolio, Analytics); assistant uses MCP | **Done on branch `feature/mcp-servers`** (2026-11-13): 341 backend tests. Not merged yet |
+| 6b, 6c, 7 (AI Finalyst) | Planned in `docs/finalyst-plan.md` (approved 2026-11-13 with full admin traces + caching added) |
 
 ## How to run (local)
 
@@ -284,6 +286,25 @@ AWS changes (deploy, teardown, IAM, Bedrock access) still need the owner's expli
    e2e in CI; README with screenshots; short demo video.
 5. Later: step 6 (MCP server, document search, guardrails, evals, tracing), then the suggestions
    multi-agent system (router, facts agent, suggestions agent on Opus, reviewer, advisor-responsibility footnote).
+
+## Step 6a: MCP servers (2026-11-13, branch feature/mcp-servers)
+
+- SDK: `mcp==2.3.0`. In 2.x FastMCP is renamed `MCPServer` (`mcp.server.mcpserver`); HTTP client is
+  `httpx2`; `Client(streamable_http_client(url, http_client=...))` takes the transport, not opened streams.
+- `wealth/mcp/portfolio.py`: low-level `Server` serving the existing registry (one security boundary,
+  `execute_tool`; schemas byte-identical). `wealth/mcp/analytics.py`: `MCPServer` decorators, pure functions
+  (allocation_drift, concentration, rebalance_preview). Both mounted in the FastAPI app at `/mcp/portfolio/`
+  and `/mcp/analytics/` (stateless, JSON responses); their session managers run in the app lifespan.
+- Identity: `wealth/mcp/internal_token.py`, HS256 JWT, audience per server, 2 minutes, key random per process
+  (or `MCP_SIGNING_KEY`). Only works with one uvicorn worker per container (true locally and on AWS).
+- Guard (`wealth/mcp/guard.py`): refuse proxy headers (X-Forwarded-For etc., because start.sh trusts proxy
+  headers from anyone), non-loopback client, missing/invalid token; SDK refuses non-loopback Host (421).
+  Verified live: outside call 403; another process in the same container 401 (signature).
+- Agent: `AdvisorAgent(tools=...)`; default MCP in the app, `LocalToolRunner` when a test connection is given
+  and in the CLI. Tool schemas are canonical (keys sorted), because the SDK reorders keys (prompt cache).
+- Each MCP tool call is about 3 loopback POSTs (protocol probe, initialize, call). Fine for now; revisit with a
+  per-turn session if latency matters. Tool list is fetched once per process.
+- Live check: assistant as Anthony answered "38 clients" with get_my_clients over MCP.
 
 ## Known follow-ups
 
