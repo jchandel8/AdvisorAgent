@@ -7,7 +7,7 @@ from contextlib import contextmanager
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.fixtures import A1, A2, A3, ADMIN, C1, C2, C3, J, K, X, Y
+from tests.fixtures import A1, A2, A3, ADMIN, C1, C2, C3, D1, D2, MISSING_ID, J, K, W, X, Y, Z
 from wealth.api import deps, routes_admin
 from wealth.api.main import create_app
 
@@ -269,3 +269,137 @@ def test_assistant_log_shows_blocked_questions(admin_api, conn):
     assert [e["question"] for e in blocked] == ["moon?"]
     everything = admin_api.get("/api/admin/assistant-events?blocked_only=false", headers=ADMIN_H).json()
     assert everything["total_rows"] == 2
+
+
+# --- drilldowns and documents ------------------------------------------------------------------------
+
+NEW_ADMIN_ROUTES = [
+    f"/api/admin/users/client/{C1}",
+    f"/api/admin/accounts/{X}",
+    "/api/admin/documents",
+    f"/api/admin/documents/{D1}",
+    f"/api/admin/documents/{D1}/content",
+    f"/api/admin/documents/{D1}/download",
+]
+
+
+@pytest.mark.parametrize("path", NEW_ADMIN_ROUTES)
+@pytest.mark.parametrize("header", [f"advisor:{A1}", f"client:{C1}"])
+def test_drilldowns_and_documents_are_admin_only(admin_api, conn, path, header):
+    assert admin_api.get(path, headers={"X-Demo-User": header}).status_code == 403
+    assert audit(conn) == []  # a refused request records nothing
+
+
+def test_client_drilldown_lists_all_their_accounts(admin_api):
+    r = admin_api.get(f"/api/admin/users/client/{C1}", headers=ADMIN_H).json()
+    assert r["profile"]["username"] == f"cli{C1}" and r["profile"]["risk_profile"] == "moderate"
+    accounts = {a["account_id"]: a for a in r["accounts"]}
+    assert set(accounts) == {X, Y, K}  # admins see every account, including closed ones
+    assert accounts[X]["role"] == "owner" and accounts[X]["advisors"] == "Adv 101"
+    assert r["accounts"][-1]["account_id"] == K  # closed accounts last
+
+
+def test_advisor_drilldown_lists_accounts_and_clients(admin_api):
+    r = admin_api.get(f"/api/admin/users/advisor/{A2}", headers=ADMIN_H).json()
+    assert {a["account_id"] for a in r["accounts"]} == {Y, J, Z, W}
+    joint = next(a for a in r["accounts"] if a["account_id"] == J)
+    assert joint["clients"] == "Cli 202, Cli 203" and joint["advisors"] == "Adv 101, Adv 102"
+    empty = admin_api.get(f"/api/admin/users/advisor/{A3}", headers=ADMIN_H).json()
+    assert empty["accounts"] == []
+
+
+def test_admin_drilldown_and_their_activity(admin_api):
+    r = admin_api.get(f"/api/admin/users/admin/{ADMIN}", headers=ADMIN_H).json()
+    assert r["profile"]["username"] == "admin901" and r["accounts"] == []
+    admin_api.post(
+        "/api/admin/access",
+        headers=ADMIN_H,
+        json={"account_id": Y, "person_type": "advisor", "person_id": A1, "role": "viewer"},
+    )
+    mine = admin_api.get(f"/api/admin/audit?admin_id={ADMIN}", headers=ADMIN_H).json()
+    assert mine["total_rows"] == 1 and mine["events"][0]["admin_id"] == ADMIN
+    other = admin_api.get(f"/api/admin/audit?admin_id={MISSING_ID}", headers=ADMIN_H).json()
+    assert other["total_rows"] == 0
+
+
+@pytest.mark.parametrize("kind", ["advisor", "client", "admin"])
+def test_unknown_user_is_404(admin_api, kind):
+    assert admin_api.get(f"/api/admin/users/{kind}/{MISSING_ID}", headers=ADMIN_H).status_code == 404
+
+
+def test_unknown_user_kind_is_422(admin_api):
+    assert admin_api.get(f"/api/admin/users/robot/{A1}", headers=ADMIN_H).status_code == 422
+
+
+def test_account_drilldown_has_users_and_documents_but_no_values(admin_api):
+    r = admin_api.get(f"/api/admin/accounts/{J}", headers=ADMIN_H).json()
+    assert r["account_name"] == "J Joint" and r["account_type"] == "joint"
+    people = {(p["person_type"], p["person_id"], p["role"]) for p in r["access"]}
+    assert people == {
+        ("client", C2, "owner"),
+        ("client", C3, "joint_owner"),
+        ("advisor", A1, "advisor"),
+        ("advisor", A2, "advisor"),
+    }
+    assert [d["document_id"] for d in r["documents"]] == [D2]
+    assert "market_value" not in str(r)  # admins don't read portfolios
+    assert admin_api.get(f"/api/admin/accounts/{MISSING_ID}", headers=ADMIN_H).status_code == 404
+
+
+def test_documents_list_search_filter_and_uploader(admin_api):
+    r = admin_api.get("/api/admin/documents", headers=ADMIN_H).json()
+    assert r["total_rows"] == 2 and [d["document_id"] for d in r["documents"]] == [D2, D1]  # newest first
+    d1 = r["documents"][1]
+    assert d1["uploaded_by"] == "Adv 101" and d1["account_name"] == "X Individual"
+    assert "text" not in d1  # the list never carries document text
+
+    def ids(**params):
+        res = admin_api.get("/api/admin/documents", headers=ADMIN_H, params=params).json()
+        return [d["document_id"] for d in res["documents"]]
+
+    assert ids(q="policy") == [D1]
+    assert ids(q="joint") == [D2]  # account name
+    assert ids(q=str(X)) == [D1]  # account ID
+    assert ids(doc_type="review_notes") == [D2]
+    assert ids(doc_type="ips", q="review") == []
+    assert admin_api.get("/api/admin/documents?doc_type=memo", headers=ADMIN_H).status_code == 422
+
+
+def test_document_detail_is_not_audited_and_has_no_text(admin_api, conn):
+    r = admin_api.get(f"/api/admin/documents/{D1}", headers=ADMIN_H).json()
+    assert r["title"] == "Investment policy statement" and r["created_date"] == "2026-03-02"
+    assert r["uploaded_by_id"] == A1 and r["access_log"] == []
+    assert "text" not in r
+    assert audit(conn) == []
+    assert admin_api.get(f"/api/admin/documents/{MISSING_ID}", headers=ADMIN_H).status_code == 404
+
+
+def test_preview_and_download_are_recorded(admin_api, conn):
+    r = admin_api.get(f"/api/admin/documents/{D1}/content", headers=ADMIN_H)
+    assert r.json()["text"] == "Target 60/40.\nRebalance yearly."
+
+    dl = admin_api.get(f"/api/admin/documents/{D1}/download", headers=ADMIN_H)
+    assert dl.status_code == 200 and dl.text == "Target 60/40.\nRebalance yearly."
+    assert dl.headers["content-type"].startswith("text/plain")
+    assert dl.headers["content-disposition"] == f'attachment; filename="investment-policy-statement-{D1}.txt"'
+    assert dl.headers["cache-control"] == "no-store"
+
+    rows = conn.execute(
+        "SELECT action, document_id, account_id, admin_id FROM permission_audit ORDER BY id"
+    ).fetchall()
+    assert [(x["action"], x["document_id"], x["account_id"], x["admin_id"]) for x in rows] == [
+        ("view_document", D1, X, ADMIN),
+        ("download_document", D1, X, ADMIN),
+    ]
+    detail = admin_api.get(f"/api/admin/documents/{D1}", headers=ADMIN_H).json()
+    assert [e["action"] for e in detail["access_log"]] == ["download_document", "view_document"]
+    log = admin_api.get("/api/admin/audit", headers=ADMIN_H).json()["events"]
+    assert (
+        log[0]["summary"] == f"Downloaded document Investment policy statement (#{D1}) of X Individual (#{X})"
+    )
+
+
+def test_missing_document_content_records_nothing(admin_api, conn):
+    assert admin_api.get(f"/api/admin/documents/{MISSING_ID}/content", headers=ADMIN_H).status_code == 404
+    assert admin_api.get(f"/api/admin/documents/{MISSING_ID}/download", headers=ADMIN_H).status_code == 404
+    assert audit(conn) == []

@@ -33,6 +33,7 @@ const adminShell: ShellData = {
   nav: [
     { path: '/admin/users', label: 'Users', icon: 'users' },
     { path: '/admin/accounts', label: 'Accounts', icon: 'briefcase' },
+    { path: '/admin/documents', label: 'Documents', icon: 'file' },
     { path: '/admin/permissions', label: 'Permissions', icon: 'shield' },
     { path: '/admin/audit', label: 'Audit log', icon: 'table' },
     { path: '/admin/assistant', label: 'Assistant log', icon: 'chat' },
@@ -129,6 +130,27 @@ export const routes: Routes = [
         path: 'accounts',
         title: 'Accounts · Admin portal',
         loadComponent: () => import('./pages/admin/accounts').then((m) => m.AdminAccounts),
+      },
+      {
+        path: 'users/:kind/:id',
+        title: 'User · Admin portal',
+        loadComponent: () => import('./pages/admin/user-detail').then((m) => m.AdminUserDetail),
+      },
+      {
+        path: 'accounts/:id',
+        title: 'Account · Admin portal',
+        loadComponent: () =>
+          import('./pages/admin/account-detail').then((m) => m.AdminAccountDetail),
+      },
+      {
+        path: 'documents',
+        title: 'Documents · Admin portal',
+        loadComponent: () => import('./pages/admin/documents').then((m) => m.AdminDocuments),
+      },
+      {
+        path: 'documents/:id',
+        title: 'Document · Admin portal',
+        loadComponent: () => import('./pages/admin/documents').then((m) => m.AdminDocumentDetail),
       },
       {
         path: 'permissions',

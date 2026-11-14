@@ -1,6 +1,7 @@
-"""Admin portal API: users, accounts, permissions, audit log, assistant log.
+"""Admin portal API: users, accounts, permissions, documents, audit log, assistant log.
 
-Admins manage access; they don't read portfolios (no holdings or transactions here). Every change is
+Admins manage access; they don't read portfolios (no holdings, transactions or values here). They may read
+documents, but every preview and download is recorded in permission_audit like a change. Every change is
 written to permission_audit in the SAME transaction as the change, so the log can't miss one.
 Advisors and clients see a grant or revoke on their next request: every query reads account_access live.
 """
@@ -15,6 +16,7 @@ from typing import Any, Literal
 import boto3
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from wealth.api.deps import CurrentUser, get_write_conn, require_admin
@@ -78,9 +80,10 @@ def get_logins() -> Logins:
 
 def _audit(conn, admin: CurrentUser, action: str, summary: str, **fields: Any) -> None:
     conn.execute(
-        """INSERT INTO permission_audit (admin_id, admin_name, action, account_id, person_type, person_id, role, summary)
+        """INSERT INTO permission_audit (admin_id, admin_name, action, account_id, person_type, person_id, role,
+                                         document_id, summary)
            VALUES (%(admin_id)s, %(admin_name)s, %(action)s, %(account_id)s, %(person_type)s, %(person_id)s,
-                   %(role)s, %(summary)s)""",
+                   %(role)s, %(document_id)s, %(summary)s)""",
         {
             "admin_id": admin.id,
             "admin_name": admin.name,
@@ -89,6 +92,7 @@ def _audit(conn, admin: CurrentUser, action: str, summary: str, **fields: Any) -
             "person_type": fields.get("person_type"),
             "person_id": fields.get("person_id"),
             "role": fields.get("role"),
+            "document_id": fields.get("document_id"),
             "summary": summary,
         },
     )
@@ -452,21 +456,197 @@ def revoke_access(access_id: int, admin: CurrentUser = Depends(require_admin), c
     return {"revoked": access_id}
 
 
+# --- drilldowns: one user, one account ---------------------------------------------------------------
+
+PROFILE_SQL = {
+    "advisor": """SELECT id, username, first_name, last_name, email, phone, certifications, city, state, created_at
+                  FROM advisors WHERE id = %s""",
+    "client": """SELECT id, username, first_name, last_name, email, phone, address, city, state, risk_profile,
+                        target_allocation, next_review_date, created_at
+                 FROM clients WHERE id = %s""",
+    "admin": "SELECT id, username, first_name, last_name, email, created_at FROM admins WHERE id = %s",
+}
+
+
+@router.get("/users/{kind}/{person_id}")
+def user_detail(
+    kind: Literal["advisor", "client", "admin"],
+    person_id: int,
+    admin: CurrentUser = Depends(require_admin),
+    conn=Depends(get_write_conn),
+):
+    """Profile plus, for advisors and clients, every account they have access to and who else is on it.
+    (Admin activity is paged separately: GET /audit?admin_id=...)"""
+    profile = conn.execute(PROFILE_SQL[kind], (person_id,)).fetchone()
+    if profile is None:
+        raise HTTPException(404, f"There is no {kind} with ID {person_id}.")
+    if kind == "admin":
+        return {"kind": kind, "profile": profile, "accounts": []}
+    id_col = "advisor_id" if kind == "advisor" else "client_id"
+    accounts = conn.execute(
+        f"""SELECT a.id AS account_id, a.account_name, a.account_type, a.open_date, a.close_date,
+                   me.role, me.granted_at,
+                   (SELECT string_agg(c.first_name || ' ' || c.last_name, ', ' ORDER BY x.role DESC, c.id)
+                      FROM account_access x JOIN clients c ON c.id = x.client_id WHERE x.account_id = a.id) AS clients,
+                   (SELECT string_agg(v.first_name || ' ' || v.last_name, ', ' ORDER BY v.id)
+                      FROM account_access x JOIN advisors v ON v.id = x.advisor_id WHERE x.account_id = a.id) AS advisors
+            FROM account_access me JOIN accounts a ON a.id = me.account_id
+            WHERE me.{id_col} = %s
+            ORDER BY a.close_date IS NOT NULL, a.account_name, a.id""",
+        (person_id,),
+    ).fetchall()
+    return {"kind": kind, "profile": profile, "accounts": accounts}
+
+
+@router.get("/accounts/{account_id}")
+def account_detail(
+    account_id: int, admin: CurrentUser = Depends(require_admin), conn=Depends(get_write_conn)
+):
+    """Account facts, everyone with access, and its documents (titles only; no portfolio values)."""
+    acct = conn.execute(
+        """SELECT id AS account_id, account_name, account_type, description, open_date, close_date
+           FROM accounts WHERE id = %s""",
+        (account_id,),
+    ).fetchone()
+    if acct is None:
+        raise HTTPException(404, "Account not found.")
+    access = account_access(account_id, admin, conn)["access"]
+    documents = conn.execute(
+        DOCUMENT_LIST_SQL + " WHERE d.account_id = %(account_id)s ORDER BY d.created_date DESC, d.id DESC",
+        {"account_id": account_id},
+    ).fetchall()
+    return {**acct, "access": access, "documents": documents}
+
+
+# --- documents ---------------------------------------------------------------------------------------
+
+DOC_TYPES = ("ips", "review_notes", "statement", "agreement")
+
+DOCUMENT_LIST_SQL = """
+    SELECT d.id AS document_id, d.title, d.doc_type, d.size_kb, d.created_date,
+           a.id AS account_id, a.account_name,
+           u.id AS uploaded_by_id, u.first_name || ' ' || u.last_name AS uploaded_by
+    FROM documents d
+    JOIN accounts a ON a.id = d.account_id
+    LEFT JOIN advisors u ON u.id = d.uploaded_by_advisor_id"""
+
+
+@router.get("/documents")
+def list_documents(
+    q: str = Query(default="", max_length=100),
+    doc_type: Literal["ips", "review_notes", "statement", "agreement"] | None = None,
+    page: int = Query(default=1, ge=1, le=10_000),
+    admin: CurrentUser = Depends(require_admin),
+    conn=Depends(get_write_conn),
+):
+    """Newest first, 50 a page. Search matches the title, the account name or an account/document ID."""
+    size = 50
+    rows = conn.execute(
+        f"""SELECT docs.*, count(*) OVER () AS total_rows
+            FROM ({DOCUMENT_LIST_SQL}
+                  WHERE (%(type)s::text IS NULL OR d.doc_type = %(type)s)
+                    AND (%(like)s = '%%%%' OR lower(d.title || ' ' || a.account_name) LIKE %(like)s
+                         OR d.id::text = %(raw)s OR a.id::text = %(raw)s)) docs
+            ORDER BY docs.created_date DESC, docs.document_id DESC LIMIT %(size)s OFFSET %(offset)s""",
+        {
+            "type": doc_type,
+            "like": f"%{q.strip().lower()}%",
+            "raw": q.strip(),
+            "size": size,
+            "offset": (page - 1) * size,
+        },
+    ).fetchall()
+    total = rows[0]["total_rows"] if rows else 0
+    for r in rows:
+        del r["total_rows"]
+    return {"page": page, "page_size": size, "total_rows": total, "documents": rows}
+
+
+def _document(conn, document_id: int) -> dict:
+    row = conn.execute(DOCUMENT_LIST_SQL + " WHERE d.id = %s", (document_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Document not found.")
+    return row
+
+
+@router.get("/documents/{document_id}")
+def document_detail(
+    document_id: int, admin: CurrentUser = Depends(require_admin), conn=Depends(get_write_conn)
+):
+    """Facts about the document and who has opened it. Not the text itself (see /content)."""
+    doc = _document(conn, document_id)
+    opened = conn.execute(
+        """SELECT id, created_at, admin_id, admin_name, action FROM permission_audit
+           WHERE document_id = %s ORDER BY created_at DESC, id DESC LIMIT 20""",
+        (document_id,),
+    ).fetchall()
+    return {**doc, "access_log": opened}
+
+
+def _record_open(conn, admin: CurrentUser, doc: dict, action: str) -> None:
+    verb = "Viewed" if action == "view_document" else "Downloaded"
+    _audit(
+        conn,
+        admin,
+        action,
+        f"{verb} document {doc['title']} (#{doc['document_id']}) of {doc['account_name']} (#{doc['account_id']})",
+        account_id=doc["account_id"],
+        document_id=doc["document_id"],
+    )
+
+
+@router.get("/documents/{document_id}/content")
+def document_content(
+    document_id: int, admin: CurrentUser = Depends(require_admin), conn=Depends(get_write_conn)
+):
+    """The document's text, for the preview. Recorded in the audit log in the same transaction."""
+    doc = _document(conn, document_id)
+    _record_open(conn, admin, doc, "view_document")
+    text = conn.execute("SELECT text FROM documents WHERE id = %s", (document_id,)).fetchone()["text"]
+    return {"document_id": document_id, "text": text}
+
+
+def _filename(title: str, document_id: int) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60] or "document"
+    return f"{slug}-{document_id}.txt"
+
+
+@router.get("/documents/{document_id}/download")
+def download_document(
+    document_id: int, admin: CurrentUser = Depends(require_admin), conn=Depends(get_write_conn)
+):
+    """The document as a .txt file. Recorded in the audit log in the same transaction."""
+    doc = _document(conn, document_id)
+    _record_open(conn, admin, doc, "download_document")
+    text = conn.execute("SELECT text FROM documents WHERE id = %s", (document_id,)).fetchone()["text"]
+    return Response(
+        content=text.encode("utf-8"),
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{_filename(doc["title"], document_id)}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 # --- logs --------------------------------------------------------------------------------------------
 
 
 @router.get("/audit")
 def audit_log(
     page: int = Query(default=1, ge=1, le=10_000),
+    admin_id: int | None = Query(default=None, gt=0),  # one admin's activity (admin drilldown)
     admin: CurrentUser = Depends(require_admin),
     conn=Depends(get_write_conn),
 ):
     size = 50
     rows = conn.execute(
-        """SELECT id, created_at, admin_name, action, account_id, person_type, person_id, role, summary,
-                  count(*) OVER () AS total_rows
-           FROM permission_audit ORDER BY created_at DESC, id DESC LIMIT %s OFFSET %s""",
-        (size, (page - 1) * size),
+        """SELECT id, created_at, admin_id, admin_name, action, account_id, person_type, person_id, role,
+                  document_id, summary, count(*) OVER () AS total_rows
+           FROM permission_audit
+           WHERE %(admin_id)s::int IS NULL OR admin_id = %(admin_id)s
+           ORDER BY created_at DESC, id DESC LIMIT %(size)s OFFSET %(offset)s""",
+        {"admin_id": admin_id, "size": size, "offset": (page - 1) * size},
     ).fetchall()
     total = rows[0]["total_rows"] if rows else 0
     for r in rows:

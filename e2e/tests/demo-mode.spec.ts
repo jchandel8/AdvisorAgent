@@ -91,8 +91,38 @@ test('admin grants an account, the advisor sees it, then the admin revokes it (d
   await advisor.reload();
   await expect(advisor.getByText('You manage 2 accounts for Kevin Keith')).toBeVisible();
 
-  // Both changes are in the audit log.
+  // Both changes are the newest two audit entries (earlier runs may have left older ones).
   await admin.goto('/admin/audit');
-  await expect(admin.getByRole('row', { name: /Revoked Anthony Gonzalez/ })).toBeVisible();
-  await expect(admin.getByRole('row', { name: /Granted Anthony Gonzalez/ })).toBeVisible();
+  const rows = admin.getByRole('table').getByRole('row');
+  await expect(rows.nth(1)).toContainText('Revoked Anthony Gonzalez');
+  await expect(rows.nth(2)).toContainText('Granted Anthony Gonzalez');
+});
+
+test('admin drills down from a client to an account to a document and downloads it', async ({ page }) => {
+  await pick(page, 'Morgan Lee');
+  await page.goto('/admin/users');
+  await page.getByRole('button', { name: 'Clients' }).click();
+  await page.getByPlaceholder('Name or username').fill('kevin keith');
+  await page.getByRole('link', { name: /Kevin Keith/ }).click();
+
+  // Client page: profile plus all 3 of Kevin's accounts (admins see every account).
+  await expect(page).toHaveURL(/\/admin\/users\/client\/10$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Kevin Keith');
+  const accounts = page.getByRole('table', { name: /Accounts for Kevin Keith/ });
+  await expect(accounts.getByRole('row')).toHaveCount(4); // header + 3
+
+  // Account page: who can see it, and its documents.
+  await accounts.getByRole('link', { name: /Roth IRA/ }).click();
+  await expect(page).toHaveURL(/\/admin\/accounts\/\d+$/);
+  await expect(page.getByRole('table', { name: /People with access/ })).toContainText('Kevin Keith');
+  await expect(page.getByRole('table', { name: /People with access/ })).toContainText('Anthony Gonzalez');
+  await page.getByRole('link', { name: /^View details of / }).first().click();
+
+  // Document page: download a .txt, which is recorded and shown under "Who has opened it".
+  await expect(page).toHaveURL(/\/admin\/documents\/\d+$/);
+  await expect(page.getByText('Uploaded by')).toBeVisible();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download .txt' }).click();
+  expect((await download).suggestedFilename()).toMatch(/^[a-z0-9-]+-\d+\.txt$/);
+  await expect(page.getByRole('table', { name: /Previews and downloads/ })).toContainText('Downloaded');
 });

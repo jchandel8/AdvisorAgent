@@ -103,6 +103,18 @@ demo_users.csv     generated; demo users first (DEMO notes); no passwords
   logins when AUTH_MODE=cognito. Admin-created Cognito logins are left in the pool.
 - E2E covers the CLAUDE.md demo script: admin grants Anthony account 19, he sees 3 of Kevin's accounts,
   admin revokes, back to 2, both in the audit log.
+- **Drilldowns + Documents (2026-11-13, branch feature/admin-drilldowns):** migration 006 adds
+  `documents.uploaded_by_advisor_id` (seeded docs: the account's lowest-ID advisor, same rule in migration and
+  loader) and `permission_audit.document_id` + actions `view_document` / `download_document`.
+  API: `GET /users/{kind}/{id}` (profile + all accounts with role, clients, advisors; admins: profile only),
+  `GET /accounts/{id}` (facts, access, document titles; no values), `GET /documents` (search title/account/ID,
+  type filter, 50/page), `GET /documents/{id}` (facts + last 20 opens; not audited, no text),
+  `/documents/{id}/content` (preview) and `/download` (.txt attachment, no-store) are each audited in the same
+  transaction. `GET /audit?admin_id=` for an admin's own activity. Owner decisions taken as recommended:
+  admins may read documents with every open audited; download as .txt; uploader recorded, S3 uploads later.
+  UI: names in Users and Accounts link to `/admin/users/:kind/:id` and `/admin/accounts/:id`; new
+  Documents nav item, `/admin/documents` and `/admin/documents/:id` (Preview, Download .txt via HttpClient blob
+  so the token is sent). E2E: admin clicks client -> account -> document -> download.
 
 ## Step 5: AWS deploy (code written, NOT applied)
 

@@ -17,6 +17,12 @@ export function apiError(err: unknown, fallback = 'That didn’t work. Try again
   return fallback;
 }
 
+/** The HTTP status of a failed request, also when a resource wrapped it (Angular keeps it in `cause`). */
+export function httpStatus(err: unknown): number | null {
+  const e = err instanceof HttpErrorResponse ? err : (err as { cause?: unknown } | null)?.cause;
+  return e instanceof HttpErrorResponse ? e.status : null;
+}
+
 export const FIELD =
   'min-h-11 w-full rounded-[var(--radius-control)] border border-rule-strong bg-surface px-3 text-base';
 

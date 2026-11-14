@@ -4,13 +4,15 @@ import { Api } from '../../core/api';
 import { Empty, ErrorState, Loading } from '../../shared/ui';
 
 const when = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
-const fmt = (iso: string) => when.format(new Date(iso));
+export const fmt = (iso: string) => when.format(new Date(iso));
 
-const ACTION_LABEL: Record<string, string> = {
+export const ACTION_LABEL: Record<string, string> = {
   grant: 'Granted',
   revoke: 'Revoked',
   create_user: 'Created user',
   create_account: 'Created account',
+  view_document: 'Viewed document',
+  download_document: 'Downloaded document',
 };
 
 const OUTCOME_LABEL: Record<string, string> = {
@@ -32,8 +34,8 @@ const OUTCOME_LABEL: Record<string, string> = {
     <header class="max-w-[66ch] space-y-1">
       <h1 class="text-[1.75rem] font-semibold">Audit log</h1>
       <p class="text-ink-muted">
-        Every change made in this portal: who made it, what changed and when. Entries can't be
-        edited.
+        Every change made in this portal, and every document an admin opened: who, what and when.
+        Entries can't be edited.
       </p>
     </header>
     <div class="mt-8">
@@ -44,7 +46,7 @@ const OUTCOME_LABEL: Record<string, string> = {
       } @else if (log.value(); as l) {
         @if (!l.events.length) {
           <app-empty
-            message="No changes yet. Granting or revoking access, or creating a user or account, adds an entry here."
+            message="No entries yet. Granting or revoking access, creating a user or account, or opening a document adds one here."
           />
         } @else {
           <div class="overflow-x-auto rounded-[var(--radius-panel)] border border-rule bg-surface">

@@ -162,11 +162,14 @@ import { Empty, ErrorState, Icon, Loading, Swatch } from '../../shared/ui';
               <tbody>
                 @for (r of a.accounts; track r.account_id) {
                   <tr class="border-t border-rule">
-                    <th scope="row" class="max-w-64 px-4 py-3 text-left font-medium">
-                      <app-swatch
-                        [accountId]="r.account_id"
-                        [label]="r.account_name + ' #' + r.account_id"
-                      />
+                    <th scope="row" class="max-w-64 px-4 py-2 text-left font-medium">
+                      <a
+                        class="inline-flex min-h-11 max-w-full items-center hover:underline"
+                        [routerLink]="['/admin/accounts', r.account_id]"
+                        ><app-swatch
+                          [accountId]="r.account_id"
+                          [label]="r.account_name + ' #' + r.account_id"
+                      /></a>
                     </th>
                     <td class="px-4 py-3">
                       {{ typeLabel[r.account_type] }}{{ r.close_date ? ' (closed)' : '' }}

@@ -36,6 +36,12 @@ TABLES = [
 ]
 
 
+DOCUMENT_UPLOADER_SQL = """
+    UPDATE documents d
+    SET uploaded_by_advisor_id = (SELECT min(x.advisor_id) FROM account_access x WHERE x.account_id = d.account_id)
+"""
+
+
 def _copy(cur: psycopg.Cursor, table: str, columns: list[str], rows: list[tuple]) -> None:
     with cur.copy(f"COPY {table} ({', '.join(columns)}) FROM STDIN") as copy:
         for row in rows:
@@ -153,6 +159,8 @@ def load(conn: psycopg.Connection, ds: Dataset) -> None:
             ["account_id", "title", "doc_type", "text", "size_kb", "created_date"],
             ds.documents,
         )
+        # Seeded documents are "uploaded" by the account's first advisor (same rule as migration 006).
+        cur.execute(DOCUMENT_UPLOADER_SQL)
 
 
 def analyze(conn: psycopg.Connection) -> None:
