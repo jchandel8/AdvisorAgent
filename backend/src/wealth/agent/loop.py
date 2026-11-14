@@ -36,7 +36,8 @@ MAX_TOOL_ROUNDS = 10  # hard stop on runaway loops (cost control)
 MAX_TOKENS = 16000
 EFFORT = "medium"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"  # re-runs a declined request on another model, server-side
-# Server-side fallback exists for these models on the Claude API (not Haiku; not on Bedrock).
+# Server-side fallback exists for these models on the Claude API only (not Haiku; not on Bedrock, where the
+# Bedrock model IDs never match this set and the provider check below turns it off as well).
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5", "claude-opus-5", "claude-fable-5-1"}
 
 
@@ -84,7 +85,7 @@ class TurnResult:
 
 
 class AdvisorAgent:
-    """One conversation for one advisor. `client` is an anthropic.Anthropic (or a test fake)."""
+    """One conversation for one advisor. `client` is an Anthropic or AnthropicBedrock (or a test fake)."""
 
     def __init__(
         self,
@@ -102,7 +103,9 @@ class AdvisorAgent:
     ):
         self.advisor_id = advisor_id
         self.client = client
-        self.model = model or get_settings().anthropic_model
+        settings = get_settings()
+        self.model = model or settings.anthropic_model
+        self.fallbacks = settings.llm_provider == "anthropic"  # server-side fallback is Claude API only
         self.today = today or date.today()
         self.cache = cache
         self.guard = guard
@@ -227,7 +230,7 @@ class AdvisorAgent:
             # Top-level cache_control caches everything up to the last block of the conversation.
             "cache_control": {"type": "ephemeral"},
         }
-        if self.model in FALLBACK_MODELS:
+        if self.fallbacks and self.model in FALLBACK_MODELS:
             options["betas"] = [FALLBACK_BETA]
             options["fallbacks"] = "default"
         return options

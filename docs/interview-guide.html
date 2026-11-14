@@ -325,7 +325,7 @@
       <summary>Why the default VPC and no NAT Gateway?</summary>
       <div>
         <p>A NAT Gateway costs about $33 a month even when idle, more than the rest of the demo. Tasks in the default
-          VPC's public subnets get a public IP so they can reach the Anthropic API, ECR and Secrets Manager directly.
+          VPC's public subnets get a public IP so they can reach AWS service endpoints (ECR, Secrets Manager, Cognito, Bedrock) directly.
           The database stays private: not publicly accessible, and its security group only accepts traffic from
           inside the VPC. In production you'd use private subnets with NAT or VPC endpoints. This is the one part
           not yet proven on AWS.</p>
@@ -410,10 +410,18 @@
         roles. The backend verifies tokens itself with the public keys rather than trusting the frontend.</p></div>
     </details>
     <details>
+      <summary>Why Bedrock on AWS but the Anthropic API locally?</summary>
+      <div><p>On AWS the container calls Claude through Amazon Bedrock with its IAM task role, so there is no API key to
+        store, rotate or leak, every call is in CloudTrail, and billing is on the AWS account. The policy allows two
+        models only, and only through US inference profiles. Locally an API key is simpler. One setting,
+        <code>LLM_PROVIDER</code>, picks the client; the agent code is identical. Trade-offs: server-side model fallback
+        is Claude-API-only, and Bedrock gates the newest models per account. 5.5 was listed but refused, so AWS runs
+        Sonnet 4.6 and Haiku 4.5 until it's enabled, which is one Terraform variable.</p></div>
+    </details>
+    <details>
       <summary>What would you change for real production?</summary>
       <div><p>Private subnets with VPC endpoints or NAT; narrow the deploy role from admin to the exact permissions;
-        Multi-AZ RDS with backups and a final snapshot; two or more tasks; Bedrock instead of the Anthropic API so
-        data stays in the AWS account; tracing and alerts (planned in step 6); tighter guardrail evals.</p></div>
+        Multi-AZ RDS with backups and a final snapshot; two or more tasks; a VPC endpoint for Bedrock so model calls never leave the AWS network; tracing and alerts (planned in step 6); tighter guardrail evals.</p></div>
     </details>
     <details>
       <summary>What was the hardest bug?</summary>

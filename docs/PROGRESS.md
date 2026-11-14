@@ -128,7 +128,17 @@ Nothing below exists on AWS yet except the Cognito pool. Every `apply` needs the
   accepts callbacks from the AWS URL.
 - Unverified risk: Express Mode tasks in the default VPC need a public IP for internet access (Anthropic
   API, Secrets Manager, ECR) since there is no NAT. Check on first deploy.
-- Bedrock is not used yet; the app still calls the Anthropic API with the key from Secrets Manager.
+- **Bedrock (2026-11-13, branch feature/bedrock):** `LLM_PROVIDER` picks the client (`wealth/llm.py`): `anthropic`
+  locally (API key), `bedrock` on AWS (`AnthropicBedrock`, ECS task role, no key). Task role policy `invoke-claude`
+  allows InvokeModel only on the configured US inference profiles, plus their foundation models only via those
+  profiles (`bedrock:InferenceProfileArn` condition; checked with simulate-custom-policy). The API key secret is no
+  longer injected on AWS. The 5.5 models are listed but return 403 "not available for this account", so AWS uses
+  `us.anthropic.claude-sonnet-4-6` + `us.anthropic.claude-haiku-4-5-20251001-v1:0` (verified live from the laptop:
+  agent answered with tools; guard classified in-scope/out-of-scope/manipulation). Haiku 4.5 rejects `effort`, so
+  the guard omits it for that model. Server-side `fallbacks` is Claude-API-only and turned off on Bedrock.
+- ALB security group (created by ECS Express, `AmazonECSManaged`): 80 and 443 open to 0.0.0.0/0 and ::/0. Only an
+  HTTPS:443 listener exists, so port 80 gets no answer; the LB is IPv4-only, so the ::/0 rules match nothing.
+  Outbound only to the task SG on 8000; task SG allows 8000 only from the ALB SG. Left as AWS manages it.
 
 ## Key decisions (and why)
 

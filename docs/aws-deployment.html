@@ -168,7 +168,7 @@
 
     <figure class="canvas">
       <svg viewBox="0 0 1200 720" id="map" role="img"
-        aria-label="GitHub (your laptop, CI and the deploy runner) sits above the AWS account in us-west-1. The runner signs in to AWS through IAM and STS with OIDC, pushes the image to ECR and keeps Terraform state in S3. Inside the default VPC, a load balancer created by ECS Express sends HTTPS traffic to one Fargate container, which reads secrets from Secrets Manager, talks to RDS PostgreSQL, writes logs to CloudWatch, manages logins in Cognito and calls the Anthropic API over the internet.">
+        aria-label="GitHub (your laptop, CI and the deploy runner) sits above the AWS account in us-west-1. The runner signs in to AWS through IAM and STS with OIDC, pushes the image to ECR and keeps Terraform state in S3. Inside the default VPC, a load balancer created by ECS Express sends HTTPS traffic to one Fargate container, which reads secrets from Secrets Manager, talks to RDS PostgreSQL, writes logs to CloudWatch, manages logins in Cognito and calls Claude on Amazon Bedrock with its IAM role.">
         <defs>
           <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
             <path d="M0 0 L10 5 L0 10 z" class="arrow" />
@@ -210,11 +210,11 @@
       <div class="card"><h3>Principal</h3><p>Who is making the call: a person, a GitHub workflow, a running container or an AWS service acting for you.</p></div>
       <div class="card"><h3>Role</h3><p>An identity with permissions but no password. Something trusted <em>assumes</em> it and gets temporary keys from STS (the Security Token Service).</p></div>
       <div class="card"><h3>Trust policy</h3><p>Attached to the role: who may assume it. For the deploy role, only GitHub tokens for this repo's <code>demo</code> environment.</p></div>
-      <div class="card"><h3>Permission policy</h3><p>What the role may do: actions on resources, e.g. <code>secretsmanager:GetSecretValue</code> on 3 named secrets only. Deny is the default; an explicit deny always wins.</p></div>
+      <div class="card"><h3>Permission policy</h3><p>What the role may do: actions on resources, e.g. <code>secretsmanager:GetSecretValue</code> on 2 named secrets only. Deny is the default; an explicit deny always wins.</p></div>
     </div>
 
     <figure class="iamfig">
-      <svg viewBox="0 0 1000 372" role="img" aria-label="Four principals each assume one role. GitHub Actions assumes the deploy role with an OIDC token and can push images, run Terraform and update Cognito URLs. ECS starting the container assumes the execution role to pull the image, write logs and read three secrets. The app code assumes the task role, which allows only four Cognito admin actions on one pool, with Bedrock planned. ECS Express assumes the infrastructure role to manage the load balancer, certificate and scaling.">
+      <svg viewBox="0 0 1000 372" role="img" aria-label="Four principals each assume one role. GitHub Actions assumes the deploy role with an OIDC token and can push images, run Terraform and update Cognito URLs. ECS starting the container assumes the execution role to pull the image, write logs and read two secrets. The app code assumes the task role, which allows four Cognito admin actions on one pool and calling two Claude models on Bedrock. ECS Express assumes the infrastructure role to manage the load balancer, certificate and scaling.">
         <defs>
           <marker id="iam-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L10 5 L0 10 z" class="ah" /></marker>
         </defs>
@@ -252,7 +252,7 @@
         <rect x="690" y="120" width="300" height="70" rx="9" class="bx" />
         <text x="702" y="142" class="r">Pull the image from ECR</text>
         <text x="702" y="159" class="r">Write to CloudWatch Logs</text>
-        <text x="702" y="176" class="r">Read the 3 secrets, inject as env vars</text>
+        <text x="702" y="176" class="r">Read 2 secrets, inject as env vars</text>
 
         <!-- Row 3: task -->
         <rect x="10" y="206" width="220" height="70" rx="9" class="bx" />
@@ -262,12 +262,12 @@
         <text x="278" y="234" class="lb" text-anchor="middle">assumes</text>
         <rect x="330" y="206" width="270" height="70" rx="9" class="bx role" />
         <text x="342" y="230" class="t">advisoragent-task</text>
-        <text x="342" y="248" class="s">inline policy manage-demo-logins</text>
+        <text x="342" y="248" class="s">manage-demo-logins + invoke-claude</text>
         <path d="M600 241 H686" class="ln" marker-end="url(#iam-ah)" />
         <rect x="690" y="206" width="300" height="70" rx="9" class="bx" />
         <text x="702" y="228" class="r">Cognito: create user, set password,</text>
         <text x="702" y="245" class="r">add to / remove from group (1 pool)</text>
-        <text x="702" y="263" class="plan">Planned: bedrock:InvokeModel (Claude)</text>
+        <text x="702" y="263" class="plan">Bedrock: invoke 2 Claude models only</text>
 
         <!-- Row 4: infrastructure -->
         <rect x="10" y="292" width="220" height="70" rx="9" class="bx" />
@@ -291,8 +291,8 @@
         <thead><tr><th scope="col">Role</th><th scope="col">Defined in</th><th scope="col">Policies</th><th scope="col">Cannot do (examples)</th></tr></thead>
         <tbody>
           <tr><td><code>advisoragent-github-deploy</code></td><td><code>infra/bootstrap/main.tf</code></td><td><code>AdministratorAccess</code></td><td>Be assumed from another repo, a fork, another branch or without the <code>demo</code> environment</td></tr>
-          <tr><td><code>advisoragent-execution</code></td><td><code>infra/app/main.tf</code></td><td><code>AmazonECSTaskExecutionRolePolicy</code> + inline <code>read-app-secrets</code></td><td>Read any secret other than the 3 named ones</td></tr>
-          <tr><td><code>advisoragent-task</code></td><td><code>infra/app/main.tf</code></td><td>Inline <code>manage-demo-logins</code></td><td>Read secrets, touch S3, RDS settings or ECR, delete Cognito users, use other pools</td></tr>
+          <tr><td><code>advisoragent-execution</code></td><td><code>infra/app/main.tf</code></td><td><code>AmazonECSTaskExecutionRolePolicy</code> + inline <code>read-app-secrets</code></td><td>Read any secret other than the 2 named ones (not even the unused Anthropic key)</td></tr>
+          <tr><td><code>advisoragent-task</code></td><td><code>infra/app/main.tf</code></td><td>Inline <code>manage-demo-logins</code> + <code>invoke-claude</code></td><td>Read secrets, touch S3, RDS settings or ECR, delete Cognito users, use other pools, call any other model or skip the US profiles</td></tr>
           <tr><td><code>advisoragent-express-infrastructure</code></td><td><code>infra/app/main.tf</code></td><td><code>AmazonECSInfrastructureRoleforExpressGatewayServices</code></td><td>Anything outside the load balancing and scaling ECS Express needs</td></tr>
         </tbody>
       </table>
@@ -328,8 +328,8 @@
         <p>Each IAM-checked call, allowed or refused, is logged with the principal that made it. That's how the first deploy's refused sign-in was diagnosed: the log showed exactly which subject GitHub sent.</p>
       </div>
       <div class="card">
-        <h3>Planned: Amazon Bedrock</h3>
-        <p>Today Claude is called on Anthropic's API with a key from Secrets Manager. With Bedrock, the task role gains <code>bedrock:InvokeModel</code> on the Claude models only and the API key secret goes away, so every credential in the system is a short-lived IAM one. Locally the app keeps using the API key; one setting picks the provider. Trade-off: Anthropic's server-side model fallback isn't available on Bedrock.</p>
+        <h3>Claude through Bedrock</h3>
+        <p>The task role's <code>invoke-claude</code> policy has two parts. It allows <code>bedrock:InvokeModel</code> on our two US inference profiles. A profile forwards the call to the model in another US region, so it also allows the foundation models in any region, but only when the call came through one of our profiles (condition <code>bedrock:InferenceProfileArn</code>). Checked with the IAM policy simulator: via the profile allowed, direct call denied, other models denied. No API key is involved, so every credential on AWS is a short-lived IAM one. Trade-off: Anthropic's server-side model fallback isn't available on Bedrock.</p>
       </div>
     </div>
   </section>
@@ -367,6 +367,7 @@
       <div class="card"><h3>GitHub's identity format</h3><p>GitHub sends <code>repo:jchandel8@191924894/AdvisorAgent@1452303973:environment:demo</code>, with permanent IDs. The role trusted the name only, so AWS refused. Found by reading the refused sign-in in CloudTrail.</p></div>
       <div class="card"><h3>A required log setting</h3><p>ECS rejected the service without <code>log_stream_prefix</code>, although the Terraform provider marks it optional. <code>terraform validate</code> can't catch API rules like this.</p></div>
       <div class="card"><h3>A provider bug that taints</h3><p>AWS filled in autoscaling defaults, the provider called it an error and marked the service tainted. Setting the values explicitly and running <code>terraform untaint</code> kept the healthy service and its URL.</p></div>
+      <div class="card"><h3>Listed is not enabled</h3><p>Bedrock listed Sonnet 5.5 and Haiku 5.5 as authorized, but calling them returned "not available for this account". A one-token test of each model found the newest that works (Sonnet 4.6, Haiku 4.5), and Haiku 4.5 needed one request field dropped (<code>effort</code>). Always test the real call before deploying.</p></div>
       <div class="card"><h3>A URL that moves</h3><p>Each re-created Express service gets a new URL. The deploy now updates Cognito's allow-list itself, reading and re-sending the full client settings, because the update call resets anything not sent.</p></div>
     </div>
   </section>
@@ -377,24 +378,24 @@
   const NS = 'http://www.w3.org/2000/svg';
   const ZONES = [
     { x: 8, y: 8, w: 680, h: 112, cls: 'z-gh', label: 'GitHub · jchandel8/AdvisorAgent', lx: 22, ly: 26, color: 'var(--gh)' },
-    { x: 230, y: 150, w: 770, h: 562, cls: 'z-aws', label: 'AWS account 900896541106 · us-west-1', lx: 246, ly: 170, color: 'var(--aws)' },
+    { x: 230, y: 150, w: 960, h: 562, cls: 'z-aws', label: 'AWS account 900896541106 · us-west-1', lx: 246, ly: 170, color: 'var(--aws)' },
     { x: 250, y: 290, w: 730, h: 250, cls: 'z-vpc', label: 'Default VPC · public subnets, one per zone · no NAT gateway', lx: 266, ly: 309, color: 'var(--vpc)' },
   ];
   const NODES = {
     dev:      { x: 30,  y: 36,  w: 160, h: 70,  t: 'Your laptop', s: ['git push to main', 'Terraform via infra/tf.sh'] },
-    ci:       { x: 210, y: 36,  w: 170, h: 70,  t: 'CI workflow', s: ['every push and PR', 'lint, 230 tests, build'] },
+    ci:       { x: 210, y: 36,  w: 170, h: 70,  t: 'CI workflow', s: ['every push and PR', 'lint, 239 tests, build'] },
     runner:   { x: 400, y: 36,  w: 270, h: 70,  t: 'Deploy / Tear down runner', s: ['ubuntu-latest · environment demo', 'docker build · terraform · aws cli'] },
     iam:      { x: 250, y: 180, w: 160, h: 76,  t: 'IAM + STS', s: ['GitHub OIDC provider', 'deploy role + 3 app roles'] },
     s3:       { x: 426, y: 180, w: 160, h: 76,  t: 'S3', s: ['Terraform state', 'versioned, encrypted'] },
     ecr:      { x: 602, y: 180, w: 160, h: 76,  t: 'ECR', s: ['image registry', 'tag = git commit SHA'] },
-    secrets:  { x: 778, y: 180, w: 200, h: 76,  t: 'Secrets Manager', s: ['Anthropic key, demo password', 'DB password (RDS-managed)'] },
+    secrets:  { x: 778, y: 180, w: 200, h: 76,  t: 'Secrets Manager', s: ['demo password', 'DB password (RDS-managed)'] },
     alb:      { x: 270, y: 370, w: 170, h: 100, t: 'Load balancer', s: ['created by ECS Express', 'HTTPS on *.on.aws', 'forwards to :8000'] },
     task:     { x: 480, y: 320, w: 250, h: 200, t: 'Fargate task: one container', s: ['0.5 vCPU · 1 GB · x86_64', 'start.sh runs:', '1  migrate the database', '2  seed data if empty', '3  create demo logins', '4  uvicorn: API + agent + web'] },
     rds:      { x: 776, y: 350, w: 190, h: 120, t: 'RDS PostgreSQL 17', s: ['db.t4g.micro · 20 GB gp3', 'encrypted · not public', '5432 from the VPC only'] },
     cognito:  { x: 250, y: 590, w: 190, h: 100, t: 'Cognito', s: ['hosted sign-in page', 'advisors, clients, admins', 'allow-list: localhost + app'] },
     ecs:      { x: 480, y: 590, w: 250, h: 100, t: 'ECS Express service', s: ['cluster advisoragent', '1 task (min = max = 1)', 'health check /api/health'] },
     logs:     { x: 776, y: 590, w: 204, h: 100, t: 'CloudWatch Logs', s: ['/advisoragent/app', 'stream prefix app/', 'kept 14 days'] },
-    anthropic:{ x: 1020, y: 370, w: 165, h: 100, t: 'Anthropic API', s: ['Haiku 5.5: scope check', 'Sonnet 5.5: agent', 'reached over the internet'] },
+    anthropic:{ x: 1012, y: 370, w: 168, h: 100, t: 'Amazon Bedrock', s: ['Haiku 4.5: scope check', 'Sonnet 4.6: agent', 'US inference profiles'] },
     browser:  { x: 30,  y: 380, w: 170, h: 80,  t: 'Browsers', s: ['advisor, client and', 'admin portals'] },
   };
 
@@ -430,13 +431,13 @@
     health:   E('alb', 'r', 'task', 'l:0.5', 'HTTP :8000'),
     https:    E('browser', 'r', 'alb', 'l', 'HTTPS'),
     signin:   E('browser', 'b', 'cognito', 'l', 'sign in (PKCE)'),
-    claude:   E('task', 't:0.92', 'anthropic', 't', 'HTTPS to Claude'),
+    claude:   E('task', 't:0.92', 'anthropic', 't', 'InvokeModel, signed with task role'),
   };
 
   const SCENARIOS = {
     build: { color: 'var(--gh)', steps: [
       { n: ['dev'], e: [['push']], text: 'You push to <code>main</code>. Every push and pull request starts the <strong>CI</strong> workflow.' },
-      { n: ['ci'], e: [], text: 'CI runs on a GitHub-hosted Ubuntu machine: <code>ruff</code> lint, 230 backend tests against a real Postgres service container, then the Angular tests and production build. Nothing touches AWS.' },
+      { n: ['ci'], e: [], text: 'CI runs on a GitHub-hosted Ubuntu machine: <code>ruff</code> lint, 239 backend tests against a real Postgres service container, then the Angular tests and production build. Nothing touches AWS.' },
       { n: ['dev', 'runner'], e: [['run']], text: 'You click <strong>Run workflow</strong> on <em>Deploy demo</em>. The job runs in the GitHub environment <code>demo</code>, which only allows <code>main</code>. A concurrency group stops a deploy and a teardown overlapping.' },
       { n: ['iam'], e: [['oidc'], ['oidc', true]], text: 'GitHub hands the job a signed OIDC token. AWS STS checks it against the trust rule (audience <code>sts.amazonaws.com</code>, subject <code>…AdvisorAgent@1452303973:environment:demo</code>) and returns keys for <code>advisoragent-github-deploy</code> that expire within an hour. No AWS keys are stored in GitHub.' },
       { n: ['runner'], e: [], text: '<code>docker build</code>, stage 1: <code>node:22-alpine</code> runs <code>npm ci</code> and <code>ng build</code>. Stage 2: <code>python:3.12-slim</code> installs locked dependencies with <code>uv sync --frozen</code>, copies in the built Angular files, and runs as a non-root user on port 8000. One image serves the API, the agent and the website.' },
@@ -453,7 +454,7 @@
     ]},
     boot: { color: 'var(--vpc)', steps: [
       { n: ['task', 'ecr'], e: [['pull']], text: 'Fargate pulls the image from ECR using the <strong>execution role</strong>. The task has a public IP, which is how it reaches AWS services and the internet without a NAT gateway.' },
-      { n: ['secrets'], e: [['inject']], text: 'Before the container starts, the execution role reads three secrets and injects them as environment variables: <code>DB_PASSWORD</code> (from the RDS-managed secret), <code>ANTHROPIC_API_KEY</code>, <code>DEMO_PASSWORD</code>.' },
+      { n: ['secrets'], e: [['inject']], text: 'Before the container starts, the execution role reads two secrets and injects them as environment variables: <code>DB_PASSWORD</code> (from the RDS-managed secret) and <code>DEMO_PASSWORD</code>. There is no Claude API key: Bedrock is called with the task role.' },
       { n: ['rds'], e: [['sql'], ['sql', true]], text: '<code>start.sh</code> step 1: <code>python -m wealth.migrate</code> applies the 5 SQL migrations. The connection string is built from <code>DB_HOST</code>, <code>DB_USER</code> and <code>DB_PASSWORD</code> with <code>sslmode=require</code>.' },
       { n: ['rds'], e: [['sql']], text: 'Step 2: <code>datagen --if-empty</code> loads the seeded demo data (about 16 seconds) only when the database is new, so a restart never wipes it.' },
       { n: ['cognito'], e: [['logins']], text: 'Step 3: <code>demo_logins --apply</code> creates or updates the 6 demo logins and their groups. The <strong>task role</strong> allows only AdminCreateUser, AdminSetUserPassword and the group calls, on this one pool.' },
@@ -466,7 +467,7 @@
       { n: ['alb'], e: [['https']], text: 'Every API call goes over HTTPS with the token. TLS ends at the load balancer.' },
       { n: ['task'], e: [['health']], text: 'The load balancer forwards to port 8000. FastAPI verifies the token itself: RS256 signature with Cognito\'s public keys, issuer, expiry, token use, app client ID, exactly one group.' },
       { n: ['rds'], e: [['sql'], ['sql', true]], text: 'The access layer reads only accounts with an <code>account_access</code> row for Anthony, inside a read-only transaction.' },
-      { n: ['anthropic'], e: [['claude'], ['claude', true]], text: 'For an assistant question, the container calls Claude over the internet: Haiku 5.5 checks scope, then Sonnet 5.5 plans tool calls. The tools run back in the container against RDS.' },
+      { n: ['anthropic'], e: [['claude'], ['claude', true]], text: 'For an assistant question, the container calls Claude on <strong>Amazon Bedrock</strong>, each request signed with the task role\'s temporary keys: Haiku 4.5 checks scope, then Sonnet 4.6 plans tool calls. The tools run back in the container against RDS.' },
       { n: ['browser'], e: [['health', true], ['https', true]], text: 'The answer goes back through the load balancer to the browser.' },
     ]},
     teardown: { color: 'var(--focus)', steps: [
@@ -511,20 +512,22 @@
       'Kept after teardown, so redeploys can reuse images.' ],
       why: 'A private registry next to ECS: fast pulls, IAM-controlled access.' },
     { id: 'secrets', tag: 'aws', where: 'us-west-1', title: 'Secrets Manager', items: [
-      '<code>advisoragent/anthropic-api-key</code> and <code>advisoragent/demo-password</code>: Terraform creates the empty secrets; you put the values in with the CLI, so Terraform never sees them.',
+      '<code>advisoragent/demo-password</code>: Terraform creates the empty secret; you put the value in with the CLI, so Terraform never sees it.',
+      '<code>advisoragent/anthropic-api-key</code> still exists but is no longer given to the container on AWS (Bedrock); it is only used if AWS is switched back to the Anthropic API.',
       'RDS-managed <code>rds!db-…</code> secret: created and rotated by RDS, deleted with the database.',
       'Values are injected into the container at start; they never appear in images, logs or GitHub.' ],
       why: 'Secrets stay out of code, state files and CI logs.' },
     { id: 'alb', tag: 'vpc', where: 'Default VPC', title: 'Load balancer (via ECS Express)', items: [
       'Created and managed by Express Mode, not written in Terraform.',
       'Public HTTPS URL <code>https://ad-&lt;id&gt;.ecs.us-west-1.on.aws</code> with an AWS-provided certificate.',
-      'Health check <code>/api/health</code>; forwards to container port 8000. The URL changes if the service is re-created.' ],
+      'Health check <code>/api/health</code>; forwards to container port 8000. The URL changes if the service is re-created.',
+      'Security group (AWS-managed): 80 and 443 open to any IPv4 and IPv6 address. Only an HTTPS 443 listener exists, so port 80 gets no answer, and the load balancer is IPv4-only, so the IPv6 rules match nothing. Outbound only to the task on 8000; the task accepts 8000 only from this group.' ],
       why: 'HTTPS and a stable entry point without hand-writing listeners, target groups and certificates.' },
     { id: 'task', tag: 'vpc', where: 'Default VPC', title: 'Fargate task', items: [
       '0.5 vCPU, 1 GB memory, x86_64; one task (min = max = 1); autoscaling metric CPU at 60% set explicitly.',
       'Environment: <code>AUTH_MODE=cognito</code>, Cognito IDs, <code>ANTHROPIC_MODEL</code>, <code>DB_HOST/USER/NAME</code>. Secrets injected separately.',
       '<code>start.sh</code>: migrate, seed if empty, create demo logins, then uvicorn with <code>--proxy-headers</code>.',
-      'Public IP in a default subnet for outbound internet (Anthropic, ECR, Secrets Manager, Cognito).' ],
+      'Public IP in a default subnet for outbound calls to AWS service endpoints (ECR, Secrets Manager, Cognito, Bedrock).' ],
       why: 'Serverless containers: no EC2 instances to patch.' },
     { id: 'rds', tag: 'vpc', where: 'Default VPC', title: 'RDS PostgreSQL', items: [
       'PostgreSQL 17, <code>db.t4g.micro</code>, 20 GB gp3, encrypted, single-AZ, not publicly accessible.',
@@ -547,11 +550,13 @@
       'Log group <code>/advisoragent/app</code>, 14-day retention, streams <code>app/…</code>.',
       'Read live with <code>aws logs tail /advisoragent/app --follow</code>.' ],
       why: 'First place to look when a deploy is unhealthy.' },
-    { id: 'anthropic', tag: 'ext', where: 'Outside AWS', title: 'Anthropic API', items: [
-      'Claude Haiku 5.5 for the scope check, Sonnet 5.5 for the agent.',
-      'Key from Secrets Manager; reached over HTTPS through the task\'s public IP.',
-      'Spend limit set on the key in the Anthropic Console; app limits of 10 a minute and 100 a day per advisor.' ],
-      why: 'Planned: Amazon Bedrock, called with the task role through IAM, so the API key goes away. <a href="#iam">See IAM.</a>' },
+    { id: 'anthropic', tag: 'aws', where: 'us-west-1 · US profiles', title: 'Amazon Bedrock', items: [
+      '<code>LLM_PROVIDER=bedrock</code>: the app uses the SDK\'s <code>AnthropicBedrock</code> client; the agent code is the same as locally.',
+      'Models: <code>us.anthropic.claude-sonnet-4-6</code> (agent) and <code>us.anthropic.claude-haiku-4-5</code> (scope check). US cross-region inference profiles: requests stay in US regions.',
+      'No API key: each request is signed with the task role\'s temporary keys; policy <code>invoke-claude</code> allows only these two models, only through these profiles.',
+      'The 5.5 models are listed but not yet enabled for this account; one Terraform variable switches to them.',
+      'App limits of 10 questions a minute and 100 a day per advisor; Bedrock usage is billed to the AWS account.' ],
+      why: 'Keeps model calls inside the AWS account, logged in CloudTrail and controlled by IAM. Locally the app still uses the Anthropic API key. <a href="#iam">See IAM.</a>' },
   ];
 
   const svg = document.getElementById('map');

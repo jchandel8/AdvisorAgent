@@ -27,6 +27,23 @@ data "aws_secretsmanager_secret" "demo_password" {
   name = "advisoragent/demo-password"
 }
 
+locals {
+  bedrock = var.llm_provider == "bedrock"
+  # Inference profile "us.anthropic.claude-x" routes to foundation model "anthropic.claude-x" in US regions.
+  model_profiles = distinct([var.anthropic_model, var.guard_model])
+  profile_arns = [
+    for m in local.model_profiles : "arn:aws:bedrock:${var.region}:${data.aws_caller_identity.current.account_id}:inference-profile/${m}"
+  ]
+  foundation_model_arns = [
+    for m in local.model_profiles : "arn:aws:bedrock:*::foundation-model/${replace(m, "/^(us|global)\\./", "")}"
+  ]
+  # Secrets the container receives at start. No Anthropic API key when Claude is called through Bedrock.
+  secret_arns = concat(
+    [data.aws_secretsmanager_secret.demo_password.arn, aws_db_instance.db.master_user_secret[0].secret_arn],
+    local.bedrock ? [] : [data.aws_secretsmanager_secret.anthropic_api_key.arn],
+  )
+}
+
 # --- Database --------------------------------------------------------------------------------------
 # Not publicly accessible. Reachable only from inside the default VPC (where the ECS tasks run), and only
 # with the password RDS keeps in Secrets Manager (manage_master_user_password). Disposable: the app
@@ -94,7 +111,7 @@ data "aws_iam_policy_document" "ecs_trust" {
   }
 }
 
-# Execution role: pull the image, write logs, read the three secrets at container start.
+# Execution role: pull the image, write logs, read the app's secrets at container start.
 resource "aws_iam_role" "execution" {
   name               = "advisoragent-execution"
   assume_role_policy = data.aws_iam_policy_document.ecs_tasks_trust.json
@@ -111,13 +128,9 @@ resource "aws_iam_role_policy" "execution_secrets" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect = "Allow"
-      Action = ["secretsmanager:GetSecretValue"]
-      Resource = [
-        data.aws_secretsmanager_secret.anthropic_api_key.arn,
-        data.aws_secretsmanager_secret.demo_password.arn,
-        aws_db_instance.db.master_user_secret[0].secret_arn,
-      ]
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = local.secret_arns
     }]
   })
 }
@@ -133,7 +146,8 @@ resource "aws_iam_role_policy_attachment" "infrastructure" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSInfrastructureRoleforExpressGatewayServices"
 }
 
-# Task role: what the running app may call. Only Cognito user administration (admin portal, demo logins).
+# Task role: what the running app may call. Cognito user administration (admin portal, demo logins) and,
+# with Bedrock, the two Claude models only.
 resource "aws_iam_role" "task" {
   name               = "advisoragent-task"
   assume_role_policy = data.aws_iam_policy_document.ecs_tasks_trust.json
@@ -154,6 +168,33 @@ resource "aws_iam_role_policy" "task_cognito" {
       ]
       Resource = "arn:aws:cognito-idp:${var.region}:${data.aws_caller_identity.current.account_id}:userpool/${var.cognito_user_pool_id}"
     }]
+  })
+}
+
+# Bedrock: invoke only the configured models, only through their US inference profiles. A cross-region
+# profile forwards the call to the foundation model in another US region, so that ARN uses region "*", and the
+# condition allows it only when the call came through one of our profiles.
+resource "aws_iam_role_policy" "task_bedrock" {
+  count = local.bedrock ? 1 : 0
+  name  = "invoke-claude"
+  role  = aws_iam_role.task.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "InferenceProfiles"
+        Effect   = "Allow"
+        Action   = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+        Resource = local.profile_arns
+      },
+      {
+        Sid       = "FoundationModelsViaProfiles"
+        Effect    = "Allow"
+        Action    = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+        Resource  = local.foundation_model_arns
+        Condition = { StringLike = { "bedrock:InferenceProfileArn" = local.profile_arns } }
+      },
+    ]
   })
 }
 
@@ -209,8 +250,20 @@ resource "aws_ecs_express_gateway_service" "app" {
       value = var.cognito_domain
     }
     environment {
+      name  = "LLM_PROVIDER"
+      value = var.llm_provider
+    }
+    environment {
+      name  = "BEDROCK_REGION"
+      value = var.region
+    }
+    environment {
       name  = "ANTHROPIC_MODEL"
       value = var.anthropic_model
+    }
+    environment {
+      name  = "GUARD_MODEL"
+      value = var.guard_model
     }
     environment {
       name  = "DB_HOST"
@@ -229,9 +282,12 @@ resource "aws_ecs_express_gateway_service" "app" {
       name       = "DB_PASSWORD"
       value_from = "${aws_db_instance.db.master_user_secret[0].secret_arn}:password::"
     }
-    secret {
-      name       = "ANTHROPIC_API_KEY"
-      value_from = data.aws_secretsmanager_secret.anthropic_api_key.arn
+    dynamic "secret" {
+      for_each = local.bedrock ? [] : [data.aws_secretsmanager_secret.anthropic_api_key.arn]
+      content {
+        name       = "ANTHROPIC_API_KEY"
+        value_from = secret.value
+      }
     }
     secret {
       name       = "DEMO_PASSWORD"
@@ -252,6 +308,7 @@ resource "aws_ecs_express_gateway_service" "app" {
     aws_iam_role_policy_attachment.infrastructure,
     aws_iam_role_policy_attachment.execution_base,
     aws_iam_role_policy.execution_secrets,
+    aws_iam_role_policy.task_bedrock,
   ]
 }
 

@@ -168,3 +168,12 @@ def test_cached_answers_skip_the_guard(conn):
     again, _ = make(conn, [], guard, cache)
     assert again.ask("hi there").from_cache
     assert len(guard.calls) == 1  # the first ask only
+
+
+def test_effort_left_out_for_models_without_it():
+    from wealth.agent.guard import _output_config
+
+    assert _output_config("claude-haiku-5-5")["effort"] == "low"
+    assert _output_config("us.anthropic.claude-haiku-5-5")["effort"] == "low"
+    no_effort = _output_config("us.anthropic.claude-haiku-4-5-20251001-v1:0")
+    assert "effort" not in no_effort and no_effort["format"]["type"] == "json_schema"

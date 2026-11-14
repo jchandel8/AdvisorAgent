@@ -34,7 +34,23 @@ from earlier ones.
 
 ## Phase 1: Accounts outside AWS (10 minutes)
 
-6. **Create an Anthropic API key just for AWS.** In the Anthropic Console, go to **API keys** and create a
+> **Claude on AWS now runs on Amazon Bedrock** (`llm_provider = "bedrock"` in `infra/app/variables.tf`).
+> The app calls Claude with its IAM task role, so steps 6, 7 and 17 (the Anthropic key) are only needed if you
+> switch AWS back to `llm_provider = "anthropic"`. Bedrock instead needs step 6b. Local development still uses
+> the Anthropic key in `.env`.
+>
+> 6b. **Check Bedrock model access** (read-only, 1 minute). Both lines must say `AUTHORIZED`:
+> ```sh
+> for m in anthropic.claude-sonnet-4-6 anthropic.claude-haiku-4-5-20251001-v1:0; do
+>   aws bedrock get-foundation-model-availability --region us-west-1 --model-id $m --query authorizationStatus
+> done
+> ```
+> On 2026-11-13 the 5.5 models returned `not available for this account` when called, although listed, so
+> AWS uses Sonnet 4.6 and Haiku 4.5. When AWS enables 5.5 for the account, change `anthropic_model` and
+> `guard_model` in `infra/app/variables.tf` to `us.anthropic.claude-sonnet-5-5` and
+> `us.anthropic.claude-haiku-5-5`, then deploy.
+
+6. **Create an Anthropic API key just for AWS** (only for `llm_provider = "anthropic"`). In the Anthropic Console, go to **API keys** and create a
    key named `advisoragent-aws`. Copy it somewhere temporary; you paste it in step 17.
    - A separate key can be revoked without breaking your local setup.
 7. **Set a spend limit in the Anthropic Console** (Settings, then Limits), for example $20 a month. The
@@ -256,7 +272,9 @@ The demo logins are created automatically each time the AWS app starts. Use the 
 | Logs say `DEMO_PASSWORD` is too short, or Cognito rejects the password | The password breaks the rules in step 9 | Put a valid value (step 18), then redeploy |
 | Sign-in page shows `redirect_mismatch` | Phase 8 not done, or the URL differs (http vs https, trailing slash) | Redo phase 8 with the exact URL |
 | "This login isn't set up for AdvisorAgent" | That username has no user in the app's database | Use a username from the phase 9 table |
-| Assistant says it is unavailable | Anthropic key missing or wrong, or out of credit | Check step 17 and the Anthropic Console |
+| Assistant says it is unavailable; logs show `403 ... is not available for this account` | The Bedrock model isn't enabled for the AWS account | Use a model that works (step 6b) or ask AWS to enable it (Bedrock console, or a support case) |
+| Assistant says it is unavailable; logs show `AccessDeniedException ... bedrock:InvokeModel` | The task role's `invoke-claude` policy doesn't cover the model in `anthropic_model` / `guard_model` | Both IDs must be `us.` inference profiles; the policy is built from them, so deploy again after fixing the IDs |
+| Assistant says it is unavailable (with `llm_provider = "anthropic"`) | Anthropic key missing or wrong, or out of credit | Check step 17 and the Anthropic Console |
 | Deploy ends with `Provider produced inconsistent result after apply` on the Express service | Provider bug when AWS fills defaults (fixed in `infra/app/main.tf` by setting them). Terraform marks the service tainted, so the next deploy would re-create it with a new URL | `infra/tf.sh app untaint aws_ecs_express_gateway_service.app` (after `init -backend-config=bucket=...`), then deploy again |
 | Unexpected AWS bill email | Stack left running | Run Tear down (step 34) |
 

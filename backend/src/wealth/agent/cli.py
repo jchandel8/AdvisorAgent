@@ -19,6 +19,7 @@ from wealth.agent.answer_cache import AnswerCache
 from wealth.agent.loop import AdvisorAgent
 from wealth.config import get_settings
 from wealth.db import close_pools, read_only
+from wealth.llm import make_client, missing_setup
 
 
 def main() -> None:
@@ -27,15 +28,16 @@ def main() -> None:
         "--advisor-id", type=int, required=True, help="the logged-in advisor (stand-in for login)"
     )
     parser.add_argument("--today", type=date.fromisoformat, help="override today's date (YYYY-MM-DD)")
-    parser.add_argument("--model", help="override ANTHROPIC_MODEL for this session")
+    parser.add_argument("--model", help="override the model for this session")
     parser.add_argument(
         "--no-cache", action="store_true", help="always call the model (skip the answer cache)"
     )
     args = parser.parse_args()
 
     settings = get_settings()
-    if not settings.anthropic_api_key:
-        sys.exit("ANTHROPIC_API_KEY is not set (put it in .env).")
+    problem = missing_setup(settings)
+    if problem:
+        sys.exit(problem)
 
     with read_only() as conn:
         if not advisor_exists(conn, args.advisor_id):
@@ -52,7 +54,7 @@ def main() -> None:
         )
     agent = AdvisorAgent(
         args.advisor_id,
-        anthropic.Anthropic(api_key=settings.anthropic_api_key),
+        make_client(settings),
         model=args.model,
         today=args.today,
         cache=cache,

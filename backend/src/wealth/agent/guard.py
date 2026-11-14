@@ -17,9 +17,10 @@ import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from wealth.config import get_settings
+
 log = logging.getLogger(__name__)
 
-GUARD_MODEL = "claude-haiku-5-5"
 
 Category = Literal["in_scope", "out_of_scope", "manipulation", "error"]
 
@@ -89,11 +90,11 @@ class Verdict:
 
 
 class ScopeGuard:
-    """Classifies a question with a small model. `client` is an anthropic.Anthropic (or a test fake)."""
+    """Classifies a question with a small model. `client` is an Anthropic or AnthropicBedrock (or a fake)."""
 
-    def __init__(self, client: Any, model: str = GUARD_MODEL):
+    def __init__(self, client: Any, model: str | None = None):
         self.client = client
-        self.model = model
+        self.model = model or get_settings().guard_model
 
     def check(
         self,
@@ -116,7 +117,7 @@ class ScopeGuard:
                 max_tokens=1024,
                 system=_INSTRUCTIONS,
                 messages=[{"role": "user", "content": f"{context}<message>\n{question}\n</message>"}],
-                output_config={"effort": "low", "format": {"type": "json_schema", "schema": _SCHEMA}},
+                output_config=_output_config(self.model),
             )
             if response.stop_reason != "end_turn":
                 return Verdict("error", f"guard stop_reason={response.stop_reason}")
@@ -129,6 +130,15 @@ class ScopeGuard:
         except Exception as exc:  # fail closed: never let a question through because the check broke
             log.warning("scope guard failed: %s", exc)
             return Verdict("error", f"guard failed: {type(exc).__name__}")
+
+
+def _output_config(model: str) -> dict:
+    """JSON-schema output, plus low effort where the model supports the effort setting (Haiku 4.5 does not;
+    it is the small model on Bedrock until the 5.5 models are enabled for the account)."""
+    config: dict = {"format": {"type": "json_schema", "schema": _SCHEMA}}
+    if "haiku-4-5" not in model:
+        config["effort"] = "low"
+    return config
 
 
 # Money ($1,234 / 1,234.56 USD) or a percentage (12.5%).

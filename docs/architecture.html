@@ -303,12 +303,12 @@
 
         <g class="node" id="n_claude">
           <rect class="box" x="980" y="120" width="200" height="150" rx="10" />
-          <text class="t" x="996" y="146">Anthropic API</text>
-          <text class="s" x="996" y="164">outside the backend</text>
+          <text class="t" x="996" y="146">Claude</text>
+          <text class="s" x="996" y="164">Anthropic API here, Bedrock on AWS</text>
           <line x1="996" y1="178" x2="1164" y2="178" stroke="var(--rule)" />
-          <text class="s" x="996" y="200" style="fill: var(--ai)">Claude Haiku 5.5</text>
+          <text class="s" x="996" y="200" style="fill: var(--ai)">Haiku 5.5 (4.5 on AWS)</text>
           <text class="s" x="996" y="216">scope check, about $0.0002</text>
-          <text class="s" x="996" y="240" style="fill: var(--ai)">Claude Sonnet 5.5</text>
+          <text class="s" x="996" y="240" style="fill: var(--ai)">Sonnet 5.5 (4.6 on AWS)</text>
           <text class="s" x="996" y="256">tool use and answers</text>
         </g>
 
@@ -352,7 +352,7 @@
     <h2 id="aws-title">How it runs on AWS</h2>
     <figure class="canvas">
       <svg viewBox="0 0 1200 380" role="img"
-        aria-label="GitHub Actions pushes the image to ECR and applies Terraform. Browsers sign in with Cognito and reach the app through the ECS Express load balancer over HTTPS. One container serves the API, the AI agent and the Angular app; it reads secrets from Secrets Manager at start, talks to RDS Postgres inside the default VPC, and calls the Anthropic API.">
+        aria-label="GitHub Actions pushes the image to ECR and applies Terraform. Browsers sign in with Cognito and reach the app through the ECS Express load balancer over HTTPS. One container serves the API, the AI agent and the Angular app; it reads secrets from Secrets Manager at start, talks to RDS Postgres inside the default VPC, and calls Claude on Amazon Bedrock with its IAM role.">
         <defs>
           <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0 0 L10 5 L0 10 z" class="arrowhead" />
@@ -408,9 +408,9 @@
         <g><rect class="box-aws" x="240" y="280" width="180" height="60" rx="10" />
           <text class="t" x="254" y="304">Amazon Cognito</text>
           <text class="s" x="254" y="322">kept on teardown</text></g>
-        <g><rect class="box" x="470" y="300" width="230" height="60" rx="10" />
-          <text class="t" x="484" y="324">Anthropic API</text>
-          <text class="s" x="484" y="342">Haiku 5.5 and Sonnet 5.5</text></g>
+        <g><rect class="box-aws" x="470" y="300" width="230" height="60" rx="10" />
+          <text class="t" x="484" y="324">Amazon Bedrock</text>
+          <text class="s" x="484" y="342">Haiku 4.5 and Sonnet 4.6, IAM role</text></g>
       </svg>
     </figure>
     <figcaption class="cap">
@@ -425,7 +425,7 @@
       <h2 id="agent-title">What it is and what it does</h2>
       <p class="lede" style="margin-top:0">
         The advisor's "Advanced Assistant". It turns a plain-English question into a few precise lookups, reads the
-        results and writes an answer. It runs inside the FastAPI backend, uses Claude through the Anthropic API, and
+        results and writes an answer. It runs inside the FastAPI backend, uses Claude (the Anthropic API locally, Amazon Bedrock on AWS; one setting, same code), and
         reaches data only through tools the backend defines. It is a manual tool-use loop, so every step is code you
         can read in <code>backend/src/wealth/agent/loop.py</code>.
       </p>
@@ -510,7 +510,7 @@
           <tr><td>Database</td><td><code>db</code> container, Postgres 17</td><td>RDS Postgres 17, private to the VPC</td></tr>
           <tr><td>Secrets</td><td><code>.env</code>, never committed</td><td>Secrets Manager, injected when the container starts</td></tr>
           <tr><td>Deploy</td><td>n/a</td><td>GitHub Actions with keyless AWS access (OIDC); Terraform</td></tr>
-          <tr><td>Claude</td><td>Anthropic API</td><td>Anthropic API</td></tr>
+          <tr><td>Claude</td><td>Anthropic API (key in <code>.env</code>)</td><td>Amazon Bedrock, called with the task's IAM role (no key)</td></tr>
         </tbody>
       </table>
     </div>
