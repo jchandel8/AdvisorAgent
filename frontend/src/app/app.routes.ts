@@ -39,6 +39,7 @@ const adminShell: ShellData = {
     { path: '/admin/permissions', label: 'Permissions', icon: 'shield' },
     { path: '/admin/audit', label: 'Audit log', icon: 'table' },
     { path: '/admin/assistant', label: 'Assistant log', icon: 'chat' },
+    { path: '/admin/agent-runs', label: 'Agent runs', icon: 'activity' },
   ],
 };
 
@@ -171,6 +172,16 @@ export const routes: Routes = [
         path: 'assistant',
         title: 'Assistant log · Admin portal',
         loadComponent: () => import('./pages/admin/logs').then((m) => m.AdminAssistantLog),
+      },
+      {
+        path: 'agent-runs',
+        title: 'Agent runs · Admin portal',
+        loadComponent: () => import('./pages/admin/agent-runs').then((m) => m.AdminAgentRuns),
+      },
+      {
+        path: 'agent-runs/:id',
+        title: 'Agent run · Admin portal',
+        loadComponent: () => import('./pages/admin/agent-runs').then((m) => m.AdminAgentRunDetail),
       },
     ],
   },

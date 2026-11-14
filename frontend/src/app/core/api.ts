@@ -13,6 +13,9 @@ import {
   UploadAccount,
   UserDetail,
   UserKind,
+  AgentRunDetail,
+  AgentRunFilters,
+  AgentRunPage,
   AssistantEvent,
   AuditEvent,
   NewAccount,
@@ -224,5 +227,20 @@ export class Api {
     return this.http.get<Paged<AssistantEvent>>('/api/admin/assistant-events', {
       params: this.params({ page, blocked_only: String(blockedOnly) }),
     });
+  }
+  agentRuns(page: number, f: AgentRunFilters = {}): Observable<AgentRunPage> {
+    return this.http.get<AgentRunPage>('/api/admin/agent-runs', {
+      params: this.params({
+        page,
+        advisor_id: f.advisorId,
+        client_id: f.clientId,
+        feature: f.feature,
+        outcome: f.outcome,
+      }),
+    });
+  }
+  /** Opening a run is recorded in the audit log (it shows client data). */
+  agentRun(id: number): Observable<AgentRunDetail> {
+    return this.http.get<AgentRunDetail>(`/api/admin/agent-runs/${id}`);
   }
 }

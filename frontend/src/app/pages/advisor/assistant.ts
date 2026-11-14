@@ -13,9 +13,8 @@ import {
 } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import DOMPurify from 'dompurify';
-import { marked } from 'marked';
 import { Api } from '../../core/api';
+import { renderMarkdown } from '../../core/markdown';
 import { ToolCall } from '../../core/models';
 import { accountParam } from '../../shared/filters';
 import { Icon } from '../../shared/ui';
@@ -407,12 +406,6 @@ export class Assistant {
         return c.name;
     }
   }
-}
-
-/** Markdown from the model -> sanitized HTML. DOMPurify removes scripts, handlers and unsafe URLs. */
-function renderMarkdown(text: string): string {
-  const html = marked.parse(text, { async: false, gfm: true, breaks: false }) as string;
-  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
 }
 
 function errorText(err: unknown): string {

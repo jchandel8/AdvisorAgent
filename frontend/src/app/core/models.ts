@@ -361,6 +361,74 @@ export interface AssistantEvent {
   outcome: string;
   question: string;
   reason: string | null;
+  run_id: number | null; // its full trace, when one was recorded
+}
+
+// ---- Agent runs (full traces, admin portal) --------------------------------------------------------------
+
+export interface AgentRun {
+  id: number;
+  feature: 'assistant' | 'finalyst';
+  started_at: string;
+  finished_at: string;
+  duration_ms: number;
+  advisor_id: number;
+  advisor_name: string;
+  focus_client_id: number | null;
+  focus_client_name: string | null;
+  question: string;
+  outcome: string;
+  model: string | null;
+  model_calls: number;
+  tool_calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  cost_usd: string | number | null;
+  cache_hit_pct: string | number | null;
+}
+
+export interface AgentStep {
+  seq: number;
+  kind: 'scope_check' | 'model' | 'tool' | 'cache' | 'note';
+  name: string;
+  started_at: string;
+  duration_ms: number;
+  request: unknown;
+  response: unknown;
+  truncated: boolean;
+  is_error: boolean;
+  stop_reason: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cache_read_tokens: number | null;
+  cache_write_tokens: number | null;
+}
+
+export interface AgentRunDetail extends AgentRun {
+  answer: string | null;
+  conversation_id: string | null;
+  assistant_event_id: number | null;
+  prompt_hash: string | null;
+  prompt_role: string | null;
+  system_prompt: string | null;
+  tool_definitions: { name: string; description: string; input_schema: unknown }[] | null;
+  steps: AgentStep[];
+}
+
+export interface AgentRunPage {
+  page: number;
+  page_size: number;
+  total_rows: number;
+  runs: AgentRun[];
+}
+
+export interface AgentRunFilters {
+  advisorId?: number | null;
+  clientId?: number | null;
+  feature?: 'assistant' | 'finalyst' | null;
+  outcome?: string | null;
 }
 
 export interface Paged<T> {
