@@ -291,7 +291,7 @@
         <thead><tr><th scope="col">Role</th><th scope="col">Defined in</th><th scope="col">Policies</th><th scope="col">Cannot do (examples)</th></tr></thead>
         <tbody>
           <tr><td><code>advisoragent-github-deploy</code></td><td><code>infra/bootstrap/main.tf</code></td><td><code>AdministratorAccess</code></td><td>Be assumed from another repo, a fork, another branch or without the <code>demo</code> environment</td></tr>
-          <tr><td><code>advisoragent-execution</code></td><td><code>infra/app/main.tf</code></td><td><code>AmazonECSTaskExecutionRolePolicy</code> + inline <code>read-app-secrets</code></td><td>Read any secret other than the 2 named ones (not even the unused Anthropic key)</td></tr>
+          <tr><td><code>advisoragent-execution</code></td><td><code>infra/app/main.tf</code></td><td><code>AmazonECSTaskExecutionRolePolicy</code> + inline <code>read-app-secrets</code></td><td>Read any secret other than the 2 named ones </td></tr>
           <tr><td><code>advisoragent-task</code></td><td><code>infra/app/main.tf</code></td><td>Inline <code>manage-demo-logins</code> + <code>invoke-claude</code></td><td>Read secrets, touch S3, RDS settings or ECR, delete Cognito users, use other pools, call any other model or skip the US profiles</td></tr>
           <tr><td><code>advisoragent-express-infrastructure</code></td><td><code>infra/app/main.tf</code></td><td><code>AmazonECSInfrastructureRoleforExpressGatewayServices</code></td><td>Anything outside the load balancing and scaling ECS Express needs</td></tr>
         </tbody>
@@ -321,7 +321,7 @@
       </div>
       <div class="card">
         <h3>Least privilege, honestly</h3>
-        <p>App roles are scoped to named resources (3 secret ARNs, one user pool ARN). The deploy role is the exception: Terraform creates many resource types, so it has admin rights, fenced by the trust policy and 1-hour sessions. Narrowing it is on the to-do list.</p>
+        <p>App roles are scoped to named resources (2 secret ARNs, one user pool ARN, two model profiles). The deploy role is the exception: Terraform creates many resource types, so it has admin rights, fenced by the trust policy and 1-hour sessions. Narrowing it is on the to-do list.</p>
       </div>
       <div class="card">
         <h3>CloudTrail records every call</h3>
@@ -341,7 +341,7 @@
         <thead><tr><th scope="col">Stack</th><th scope="col">Creates</th><th scope="col">State kept in</th><th scope="col">Lifetime</th></tr></thead>
         <tbody>
           <tr><td><code>infra/bootstrap</code></td><td>S3 state bucket, GitHub OIDC provider, deploy role</td><td>Your laptop (local file)</td><td>Once</td></tr>
-          <tr><td><code>infra/persistent</code></td><td>Cognito pool, client, domain, groups; ECR; 2 secrets</td><td>Your laptop (local file)</td><td>Kept forever</td></tr>
+          <tr><td><code>infra/persistent</code></td><td>Cognito pool, client, domain, groups; ECR; demo password secret</td><td>Your laptop (local file)</td><td>Kept forever</td></tr>
           <tr><td><code>infra/app</code></td><td>RDS, security group, IAM roles, log group, ECS cluster, Express service</td><td>S3 <code>app/terraform.tfstate</code></td><td>Deploy creates, Teardown destroys</td></tr>
         </tbody>
       </table>
@@ -355,7 +355,7 @@
         <thead><tr><th scope="col">State</th><th scope="col">Main costs</th><th scope="col">About</th></tr></thead>
         <tbody>
           <tr><td>Running</td><td>Load balancer, Fargate task (0.5 vCPU, 1 GB), RDS db.t4g.micro, public IPv4 addresses, plus Claude usage</td><td class="num">$60–90 / month</td></tr>
-          <tr><td>Torn down</td><td>2 secrets ($0.40 each), ECR images, S3 state, Cognito (free at this size)</td><td class="num">≈ $1 / month</td></tr>
+          <tr><td>Torn down</td><td>1 secret ($0.40), ECR images, S3 state, Cognito (free at this size)</td><td class="num">≈ $1 / month</td></tr>
         </tbody>
       </table>
     </div>
@@ -476,7 +476,7 @@
       { n: ['s3'], e: [['state'], ['state', true]], text: 'Terraform reads the state from S3 to know exactly what it created, so it deletes only those resources.' },
       { n: ['ecs', 'alb', 'task'], e: [['tf']], text: '<code>terraform destroy</code> removes the Express service, which takes down the load balancer, certificate and task.', gone: [] },
       { n: ['rds'], e: [['tf']], text: 'It deletes the database without a final snapshot (the next deploy re-seeds), which also deletes its managed password secret.' },
-      { n: [], e: [], text: 'Then the IAM roles, log group, cluster and security group. Left (dashed green): S3 state, ECR images, the two secrets, Cognito and the deploy role, about $1 a month.',
+      { n: [], e: [], text: 'Then the IAM roles, log group, cluster and security group. Left (dashed green): S3 state, ECR images, the demo password secret, Cognito and the deploy role, about $1 a month.',
         kept: ['s3', 'ecr', 'secrets', 'cognito', 'iam'], gone: ['ecs', 'alb', 'task', 'rds', 'logs'] },
     ]},
   };
@@ -497,7 +497,7 @@
     { id: 'iam', tag: 'aws', where: 'Global (IAM)', title: 'IAM + STS', items: [
       'OIDC provider <code>token.actions.githubusercontent.com</code>, audience <code>sts.amazonaws.com</code>.',
       'Role <code>advisoragent-github-deploy</code>: trusted only for subject <code>repo:jchandel8@191924894/AdvisorAgent@1452303973:environment:demo</code>; sessions at most 1 hour; AdministratorAccess for now (to narrow).',
-      '<strong>Execution role</strong>: pull from ECR, write logs, read the 3 secrets.',
+      '<strong>Execution role</strong>: pull from ECR, write logs, read the 2 secrets (demo password, DB password).',
       '<strong>Infrastructure role</strong>: lets ECS Express manage the load balancer, certificate and scaling (AWS-managed policy).',
       '<strong>Task role</strong>: the app itself, only Cognito admin calls on this pool.' ],
       why: 'Least privilege per job: the running app can\'t read secrets it wasn\'t given or touch other AWS resources. <a href="#iam">Full IAM picture below.</a>' },
@@ -513,7 +513,7 @@
       why: 'A private registry next to ECS: fast pulls, IAM-controlled access.' },
     { id: 'secrets', tag: 'aws', where: 'us-west-1', title: 'Secrets Manager', items: [
       '<code>advisoragent/demo-password</code>: Terraform creates the empty secret; you put the value in with the CLI, so Terraform never sees it.',
-      '<code>advisoragent/anthropic-api-key</code> still exists but is no longer given to the container on AWS (Bedrock); it is only used if AWS is switched back to the Anthropic API.',
+      'There is no Claude API key on AWS: Bedrock is called with the task role. (The old Anthropic key secret was deleted on 2026-11-13.)',
       'RDS-managed <code>rds!db-…</code> secret: created and rotated by RDS, deleted with the database.',
       'Values are injected into the container at start; they never appear in images, logs or GitHub.' ],
       why: 'Secrets stay out of code, state files and CI logs.' },

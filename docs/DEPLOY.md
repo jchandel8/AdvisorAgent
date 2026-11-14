@@ -34,28 +34,19 @@ from earlier ones.
 
 ## Phase 1: Accounts outside AWS (10 minutes)
 
-> **Claude on AWS now runs on Amazon Bedrock** (`llm_provider = "bedrock"` in `infra/app/variables.tf`).
-> The app calls Claude with its IAM task role, so steps 6, 7 and 17 (the Anthropic key) are only needed if you
-> switch AWS back to `llm_provider = "anthropic"`. Bedrock instead needs step 6b. Local development still uses
-> the Anthropic key in `.env`.
->
-> 6b. **Check Bedrock model access** (read-only, 1 minute). Both lines must say `AUTHORIZED`:
-> ```sh
-> for m in anthropic.claude-sonnet-4-6 anthropic.claude-haiku-4-5-20251001-v1:0; do
->   aws bedrock get-foundation-model-availability --region us-west-1 --model-id $m --query authorizationStatus
-> done
-> ```
-> On 2026-11-13 the 5.5 models returned `not available for this account` when called, although listed, so
-> AWS uses Sonnet 4.6 and Haiku 4.5. When AWS enables 5.5 for the account, change `anthropic_model` and
-> `guard_model` in `infra/app/variables.tf` to `us.anthropic.claude-sonnet-5-5` and
-> `us.anthropic.claude-haiku-5-5`, then deploy.
-
-6. **Create an Anthropic API key just for AWS** (only for `llm_provider = "anthropic"`). In the Anthropic Console, go to **API keys** and create a
-   key named `advisoragent-aws`. Copy it somewhere temporary; you paste it in step 17.
-   - A separate key can be revoked without breaking your local setup.
-7. **Set a spend limit in the Anthropic Console** (Settings, then Limits), for example $20 a month. The
-   app also limits each advisor to 10 questions a minute and 100 a day, but a hard cap on the key is the
-   safety net.
+6. **Check Bedrock model access** (read-only, 1 minute). Claude on AWS runs on Amazon Bedrock, called with
+   the app's IAM task role, so there is no Claude API key on AWS. Both lines must say `AUTHORIZED`:
+   ```sh
+   for m in anthropic.claude-sonnet-4-6 anthropic.claude-haiku-4-5-20251001-v1:0; do
+     aws bedrock get-foundation-model-availability --region us-west-1 --model-id $m --query authorizationStatus
+   done
+   ```
+   On 2026-11-13 the 5.5 models returned `not available for this account` when called, although listed, so
+   AWS uses Sonnet 4.6 and Haiku 4.5. When AWS enables 5.5 for the account, change `anthropic_model` and
+   `guard_model` in `infra/app/variables.tf` to `us.anthropic.claude-sonnet-5-5` and
+   `us.anthropic.claude-haiku-5-5`, then deploy. Local development still uses the Anthropic key in `.env`.
+7. *(Removed: the Anthropic key and its spend limit were only needed before Bedrock. The app's own limits,
+   10 questions a minute and 100 a day per advisor, still apply; the AWS budget alert below is the cap.)*
 8. **Create an AWS budget alert** (in the AWS console, it takes 2 minutes):
    1. Open **Billing and Cost Management**, then **Budgets**, then **Create budget**.
    2. Choose **Use a template**, then **Monthly cost budget**.
@@ -114,9 +105,8 @@ This adds the image registry (ECR) and two empty secret slots next to the Cognit
     ```sh
     infra/tf.sh persistent plan
     ```
-    It must say **`Plan: 4 to add, 0 to change, 0 to destroy.`**
-    - The 4 are: the ECR repository, its lifecycle rule, and the secrets
-      `advisoragent/anthropic-api-key` and `advisoragent/demo-password`.
+    It must say **`Plan: 3 to add, 0 to change, 0 to destroy.`**
+    - The 3 are: the ECR repository, its lifecycle rule, and the secret `advisoragent/demo-password`.
     - **If it shows anything to destroy (especially Cognito), stop.** Destroying the pool deletes every login.
 16. **Apply** (type `yes`):
     ```sh
@@ -128,26 +118,19 @@ This adds the image registry (ECR) and two empty secret slots next to the Cognit
 These commands ask for each value without echoing it, so it never appears on screen or in your shell
 history.
 
-17. **Anthropic key** (the one from step 6):
-    ```sh
-    read -rs "KEY?Anthropic API key: "; echo
-    aws secretsmanager put-secret-value --secret-id advisoragent/anthropic-api-key --secret-string "$KEY"
-    unset KEY
-    ```
+17. *(Removed: no Anthropic key on AWS.)*
 18. **Demo password** (the one from step 9):
     ```sh
     read -rs "PW?Demo password: "; echo
     aws secretsmanager put-secret-value --secret-id advisoragent/demo-password --secret-string "$PW"
     unset PW
     ```
-    Each command prints a JSON block with `"VersionId"`, which means it worked.
-19. **Check that both secrets have a value**, without showing the values:
+    The command prints a JSON block with `"VersionId"`, which means it worked.
+19. **Check that the secret has a value**, without showing it:
     ```sh
-    for s in anthropic-api-key demo-password; do
-      aws secretsmanager describe-secret --secret-id advisoragent/$s --query '{name:Name,versions:VersionIdsToStages}'
-    done
+    aws secretsmanager describe-secret --secret-id advisoragent/demo-password --query '{name:Name,versions:VersionIdsToStages}'
     ```
-    Each one shows a version marked `AWSCURRENT`.
+    It shows a version marked `AWSCURRENT`.
 
 ## Phase 6: GitHub settings (5 minutes)
 
@@ -272,9 +255,8 @@ The demo logins are created automatically each time the AWS app starts. Use the 
 | Logs say `DEMO_PASSWORD` is too short, or Cognito rejects the password | The password breaks the rules in step 9 | Put a valid value (step 18), then redeploy |
 | Sign-in page shows `redirect_mismatch` | Phase 8 not done, or the URL differs (http vs https, trailing slash) | Redo phase 8 with the exact URL |
 | "This login isn't set up for AdvisorAgent" | That username has no user in the app's database | Use a username from the phase 9 table |
-| Assistant says it is unavailable; logs show `403 ... is not available for this account` | The Bedrock model isn't enabled for the AWS account | Use a model that works (step 6b) or ask AWS to enable it (Bedrock console, or a support case) |
+| Assistant says it is unavailable; logs show `403 ... is not available for this account` | The Bedrock model isn't enabled for the AWS account | Use a model that works (step 6) or ask AWS to enable it (Bedrock console, or a support case) |
 | Assistant says it is unavailable; logs show `AccessDeniedException ... bedrock:InvokeModel` | The task role's `invoke-claude` policy doesn't cover the model in `anthropic_model` / `guard_model` | Both IDs must be `us.` inference profiles; the policy is built from them, so deploy again after fixing the IDs |
-| Assistant says it is unavailable (with `llm_provider = "anthropic"`) | Anthropic key missing or wrong, or out of credit | Check step 17 and the Anthropic Console |
 | Deploy ends with `Provider produced inconsistent result after apply` on the Express service | Provider bug when AWS fills defaults (fixed in `infra/app/main.tf` by setting them). Terraform marks the service tainted, so the next deploy would re-create it with a new URL | `infra/tf.sh app untaint aws_ecs_express_gateway_service.app` (after `init -backend-config=bucket=...`), then deploy again |
 | Unexpected AWS bill email | Stack left running | Run Tear down (step 34) |
 

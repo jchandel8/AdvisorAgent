@@ -117,7 +117,8 @@ Nothing below exists on AWS yet except the Cognito pool. Every `apply` needs the
   1. `infra/bootstrap` (local state): tfstate S3 bucket, GitHub OIDC provider, deploy role
      `advisoragent-github-deploy` (main branch only; AdministratorAccess for now; tighten later). Plan: 7 to add.
   2. `infra/persistent` (local state): Cognito (applied) + NEW ECR repo `advisoragent` and secrets
-     `advisoragent/anthropic-api-key`, `advisoragent/demo-password` (values put by the owner, not in TF). Plan: 4 to add.
+     `advisoragent/demo-password` (value put by the owner, not in TF). The Anthropic key secret was removed
+     2026-11-13 (AWS uses Bedrock; there is no Claude API key on AWS).
   3. `infra/app` (S3 backend): default VPC (no NAT), RDS Postgres 17 db.t4g.micro private,
      ECS Express Mode service (port 8000, health `/api/health`, 0.5 vCPU / 1 GB, 1 task), IAM roles, logs.
      Output `APP_URL`. Destroyed by Teardown; persistent stack kept.
