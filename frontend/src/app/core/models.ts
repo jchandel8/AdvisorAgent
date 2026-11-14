@@ -335,12 +335,14 @@ export interface DocumentPage {
   documents: AdminDocument[];
 }
 
+/** One open of a document, from the admin portal or the advisor/client portals. */
 export interface DocumentOpen {
-  id: number;
+  key: string;
   created_at: string;
-  admin_id: number | null;
-  admin_name: string;
-  action: 'view_document' | 'download_document';
+  person_type: 'admin' | 'advisor' | 'client';
+  person_id: number | null;
+  name: string;
+  action: 'view' | 'download';
 }
 
 export interface DocumentDetail extends AdminDocument {

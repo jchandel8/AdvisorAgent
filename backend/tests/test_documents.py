@@ -273,6 +273,25 @@ def test_seeded_document_opens_as_text(api):
     assert r.headers["content-disposition"] == f'inline; filename="investment-policy-statement-{D1}.txt"'
 
 
+def test_admin_sees_opens_from_the_portals(api, conn):
+    doc = upload(api, "client", C2, J).json()["document_id"]
+    assert (
+        api.get(f"/api/documents/{doc}/file?disposition=inline", headers=H("advisor", A1)).status_code == 200
+    )
+    assert api.get(f"/api/documents/{doc}/file", headers=H("client", C3)).status_code == 200
+    assert api.get(f"/api/admin/documents/{doc}/download", headers=H("admin", ADMIN)).status_code == 200
+
+    log = api.get(f"/api/admin/documents/{doc}", headers=H("admin", ADMIN)).json()["access_log"]
+    # The upload itself is not an open. (Order isn't checked: one test transaction gives every row the
+    # same timestamp.)
+    assert {(e["action"], e["person_type"], e["person_id"]) for e in log} == {
+        ("download", "admin", ADMIN),
+        ("download", "client", C3),
+        ("view", "advisor", A1),
+    }
+    assert all(e["name"] for e in log) and len({e["key"] for e in log}) == 3
+
+
 # --- deleting ----------------------------------------------------------------------------------------
 
 

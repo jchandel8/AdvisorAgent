@@ -392,7 +392,10 @@ def test_preview_and_download_are_recorded(admin_api, conn):
         ("download_document", D1, X, ADMIN),
     ]
     detail = admin_api.get(f"/api/admin/documents/{D1}", headers=ADMIN_H).json()
-    assert [e["action"] for e in detail["access_log"]] == ["download_document", "view_document"]
+    assert [(e["action"], e["person_type"], e["person_id"]) for e in detail["access_log"]] == [
+        ("download", "admin", ADMIN),
+        ("view", "admin", ADMIN),
+    ]
     log = admin_api.get("/api/admin/audit", headers=ADMIN_H).json()["events"]
     assert (
         log[0]["summary"] == f"Downloaded document Investment policy statement (#{D1}) of X Individual (#{X})"
