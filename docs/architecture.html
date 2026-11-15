@@ -165,6 +165,55 @@
     </p>
   </header>
 
+  <section aria-labelledby="summary-title" style="display:grid; gap:16px">
+    <h2 id="summary-title">Project summary</h2>
+    <p class="lede" style="margin-top:0">A <strong>production-grade, secure, multi-agent AI platform</strong> for
+      wealth management, designed and built end to end and deployed on AWS. Financial advisors ask questions in plain
+      English, and Claude-powered agents answer from portfolio, CRM and document data, but only for the accounts that
+      advisor is entitled to see. Three role-based web portals (advisor, client, admin) share one FastAPI backend, so the
+      permission model can be checked side by side. Infrastructure is code (<strong>Terraform</strong>), deployments run
+      through <strong>GitHub Actions CI/CD</strong>, and the stack is Python, FastAPI, Angular, PostgreSQL and Claude on
+      <strong>Amazon Bedrock</strong>.</p>
+    <div class="grid">
+      <div class="card"><h3>Security by design</h3><p>Zero-trust data access for AI: identity comes only from verified
+        <strong>Amazon Cognito</strong> JWTs (OIDC), never from the prompt or the model. Role-based portals plus
+        per-account entitlements (ACL) enforced in every SQL query, so even a successful prompt injection cannot reach
+        data the user isn't entitled to. Prompt-injection and scope guardrails, a data-egress guard that keeps client PII
+        out of web searches, least-privilege IAM roles, secrets in <strong>AWS Secrets Manager</strong>, and an audit log
+        of every permission change and document access.</p></div>
+      <div class="card"><h3>Multi-agent orchestration</h3><p>The <strong>AI Finalyst</strong> orchestrates specialized
+        agents in code: a research agent (live market news), analytics, a writer agent (Claude Opus) and a reviewer agent
+        (Claude Sonnet), with parallel execution, structured JSON outputs, a self-correcting review-and-revise loop and
+        deterministic validation of every figure. Human-in-the-loop by design: it prepares evidence-backed briefs; the
+        advisor decides.</p></div>
+      <div class="card"><h3>Agentic AI and MCP</h3><p>A tool-using Claude agent answers advisors' plain-English questions
+        over portfolio, CRM and document data. Tools are served through three <strong>Model Context Protocol (MCP)</strong>
+        servers (portfolio, analytics, market) protected by short-lived signed service tokens. Retrieval over client
+        documents with Postgres full-text search (RAG). Runs on the Anthropic API locally and <strong>Amazon Bedrock</strong>
+        on AWS with no API keys.</p></div>
+      <div class="card"><h3>Observability, quality and cost control</h3><p>End-to-end agent tracing: every model call,
+        tool call, input, output, token count and cost, viewable (and audited) in the admin portal. Prompt caching
+        (87% of input tokens served from cache), an LLM evaluation suite (19 of 19 cases passing), per-user rate limits
+        and daily caps, and 440+ automated tests (419 backend, 15 frontend, 8 Playwright end-to-end).</p></div>
+    </div>
+    <h3>AWS services</h3>
+    <div class="tablewrap"><table>
+        <thead><tr><th>AWS service</th><th>What it does here</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Amazon ECS (Express Mode)</strong></td><td>Runs the containerized FastAPI backend and Angular frontend behind a managed HTTPS load balancer</td></tr>
+          <tr><td><strong>Amazon ECR</strong></td><td>Private container image registry, with a lifecycle policy</td></tr>
+          <tr><td><strong>Amazon RDS for PostgreSQL</strong></td><td>Managed relational database: accounts, entitlements, holdings, audit log, agent traces</td></tr>
+          <tr><td><strong>Amazon Cognito</strong></td><td>User pool with advisor, client and admin groups; hosted login; JWT (OIDC) tokens verified on every request</td></tr>
+          <tr><td><strong>Amazon Bedrock</strong></td><td>Claude models (Sonnet, Haiku, optional Opus) invoked through IAM roles and inference profiles, no API keys</td></tr>
+          <tr><td><strong>Amazon S3</strong></td><td>Private, encrypted, versioned bucket for shared client documents, streamed only after an access check; also Terraform state</td></tr>
+          <tr><td><strong>AWS Secrets Manager</strong></td><td>Database credentials, demo password and the news-search API key, injected into containers at runtime</td></tr>
+          <tr><td><strong>AWS IAM</strong></td><td>Least-privilege task roles; GitHub Actions deploys through OIDC federation with no stored AWS keys</td></tr>
+          <tr><td><strong>Amazon CloudWatch</strong></td><td>Container logs</td></tr>
+          <tr><td><strong>Amazon VPC</strong></td><td>Security groups that limit database access to the application</td></tr>
+        </tbody>
+      </table></div>
+  </section>
+
   <section class="stage" aria-labelledby="flow-title">
     <h2 id="flow-title">Follow a request</h2>
     <div class="controls">

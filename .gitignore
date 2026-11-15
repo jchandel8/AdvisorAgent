@@ -15,3 +15,13 @@ dist/
 *.tfplan
 crash.log
 backend/evals/results/
+
+# Personal notes, plans, interview prep and AI-assistant files: kept locally, never committed
+CLAUDE.md
+.claude/
+GeneratedfromClaude/
+.vscode/
+design-system/
+docs/*
+!docs/architecture.html
+*.pdf

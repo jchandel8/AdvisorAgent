@@ -4,7 +4,7 @@ A secure, production-style AI agent for wealth advisors. Advisors ask questions 
 answers by calling tools over mock portfolio data. Every tool runs as the logged-in advisor and returns only the
 accounts that advisor can access (per-account ACL).
 
-See [CLAUDE.md](CLAUDE.md) for the design and [docs/PROGRESS.md](docs/PROGRESS.md) for status and decisions.
+See [docs/architecture.html](docs/architecture.html) for the architecture.
 
 ## Quick start (local)
 
