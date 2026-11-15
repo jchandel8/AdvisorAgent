@@ -95,7 +95,7 @@ def current_user(
 
 
 def _cognito_user(authorization: str | None, conn: psycopg.Connection, key_resolver) -> CurrentUser:
-    """Identity comes ONLY from a verified Cognito access token (CLAUDE.md: the one security rule)."""
+    """Identity comes ONLY from a verified Cognito access token (the one security rule)."""
     s = get_settings()
     if not (s.cognito_issuer and s.cognito_client_id):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign-in is not configured.")
