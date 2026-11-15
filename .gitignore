@@ -16,7 +16,7 @@ dist/
 crash.log
 backend/evals/results/
 
-# Personal notes, plans, interview prep and AI-assistant files: kept locally, never committed
+# Local-only files
 CLAUDE.md
 .claude/
 GeneratedfromClaude/
